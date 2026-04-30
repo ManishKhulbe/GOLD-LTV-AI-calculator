@@ -10,8 +10,8 @@ const initialForm = {
 
 const BACKEND_BASE_URL = 'http://127.0.0.1:8001'
 
-const formatAed = (value) =>
-  value != null ? `AED ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+const formatSar = (value) =>
+  value != null ? `SAR ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
 
 function App() {
   const [form, setForm] = useState(initialForm)
@@ -313,13 +313,13 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <MetricChip label="Gold Valuation" value={formatAed(r.gold_valuation_aed)} />
-            <MetricChip label="Eligible Loan Amount" value={formatAed(r.eligible_loan_amount_aed)} />
+            <MetricChip label="Gold Valuation" value={formatSar(r.gold_valuation_sar)} />
+            <MetricChip label="Eligible Loan Amount" value={formatSar(r.eligible_loan_amount_sar)} />
           </div>
-          {r.future_eligible_loan_amount_aed != null && r.eligible_loan_amount_aed != null && (() => {
-            const delta = r.future_eligible_loan_amount_aed - r.eligible_loan_amount_aed
-            const deltaPct = r.eligible_loan_amount_aed !== 0
-              ? ((delta / r.eligible_loan_amount_aed) * 100).toFixed(1)
+          {r.future_eligible_loan_amount_sar != null && r.eligible_loan_amount_sar != null && (() => {
+            const delta = r.future_eligible_loan_amount_sar - r.eligible_loan_amount_sar
+            const deltaPct = r.eligible_loan_amount_sar !== 0
+              ? ((delta / r.eligible_loan_amount_sar) * 100).toFixed(1)
               : '0.0'
             const rising = delta >= 0
             return (
@@ -327,7 +327,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-xs text-[#c8a84b]">Future-Adjusted Loan Estimate</p>
-                    <p className="mt-1 text-lg font-semibold text-[#f2cf84]">{formatAed(r.future_eligible_loan_amount_aed)}</p>
+                    <p className="mt-1 text-lg font-semibold text-[#f2cf84]">{formatSar(r.future_eligible_loan_amount_sar)}</p>
                     <p className="mt-0.5 text-[10px] text-[#6b839f]">
                       Based on predicted gold price at {r.suggested_tenure_months}-month tenure end
                     </p>
@@ -357,7 +357,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
           <div className="mt-3 space-y-2 text-sm text-[#4b5563]">
             <p className="flex justify-between">
               <span>Recommended Amount</span>
-              <span className="font-semibold">{formatAed(r.eligible_loan_amount_aed)}</span>
+              <span className="font-semibold">{formatSar(r.eligible_loan_amount_sar)}</span>
             </p>
             <p className="flex justify-between">
               <span>Suggested Tenure</span>
@@ -366,11 +366,6 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
               </span>
             </p>
           </div>
-          {r.remarks ? (
-            <div className="mt-3 rounded-md border border-[#e5e7eb] bg-[#fbfbfc] p-2 text-xs text-[#7b8496]">
-              {r.remarks}
-            </div>
-          ) : null}
           <button
             type="button"
             onClick={() => setActiveScreen('calculator')}
@@ -413,7 +408,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
             ['Active Loans', history.active_loans ?? '—'],
             ['Closed Loans', history.closed_loans ?? '—'],
             ['Missed EMIs', history.missed_emis ?? '—'],
-            ['Outstanding Balance', formatAed(history.outstanding_balance)],
+            ['Outstanding Balance', formatSar(history.outstanding_balance)],
           ]}
         />
       </div>
@@ -485,7 +480,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                         <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusColor}`}>
                           {row.status}
                         </span>
-                        <p className="text-[10px] font-medium text-[#c8d8ef]">{formatAed(row.amount)}</p>
+                        <p className="text-[10px] font-medium text-[#c8d8ef]">{formatSar(row.amount)}</p>
                       </div>
                     </div>
                   )
@@ -511,7 +506,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
 function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
   const historicalRaw = goldInsights.historical_prices ?? []
   const predictedRaw = goldInsights.predicted_prices ?? []
-  const livePrice = goldInsights.live_price_sar_per_gram ?? goldInsights.live_price_aed_per_gram ?? null
+  const livePrice = goldInsights.live_price_sar_per_gram ?? null
 
   const fmtLabel = (dateStr) => {
     const d = new Date(dateStr + 'T00:00:00')

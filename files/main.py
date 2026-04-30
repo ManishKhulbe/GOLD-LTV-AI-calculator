@@ -228,7 +228,7 @@ async def calculate_loan(req: LoanCalculationRequest):
         history=history,
         gold_insights=gold_insights,
         job_profession=req.job_profession.value,
-        eligible_loan_aed=calc["eligible_loan_amount_aed"],
+        eligible_loan_aed=calc["eligible_loan_amount_sar"],
         ltv_pct=calc["recommended_ltv_pct"],
         tenure_months=req.tenure_months.value,
     )

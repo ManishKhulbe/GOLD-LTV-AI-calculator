@@ -98,9 +98,9 @@ def calculate_ltv_and_loan(
     # ── Gold valuation ────────────────────────────────────────────────────────
     purity              = CARAT_PURITY[carat.value]
     pure_grams          = gold_weight_grams * purity
-    live_price          = gold_insights.live_price_aed_per_gram
+    live_price          = gold_insights.live_price_sar_per_gram
     gold_valuation      = round(pure_grams * live_price, 2)
-    future_price        = gold_insights.predicted_end_price_aed_per_gram
+    future_price        = gold_insights.predicted_end_price_sar_per_gram
     future_gold_valuation = round(pure_grams * future_price, 2)
 
     # ── Individual factors ────────────────────────────────────────────────────
@@ -150,10 +150,10 @@ def calculate_ltv_and_loan(
     return dict(
         system_decision=decision,
         recommended_ltv_pct=round(final_ltv * 100, 2),
-        gold_valuation_aed=gold_valuation,
-        eligible_loan_amount_aed=eligible_amount,
-        future_gold_valuation_aed=future_gold_valuation,
-        future_eligible_loan_amount_aed=future_eligible_amount,
+        gold_valuation_sar=gold_valuation,
+        eligible_loan_amount_sar=eligible_amount,
+        future_gold_valuation_sar=future_gold_valuation,
+        future_eligible_loan_amount_sar=future_eligible_amount,
         suggested_tenure_months=tenure_months,
         cibil_score=customer.cibil_score,
         cibil_label=cibil_label,

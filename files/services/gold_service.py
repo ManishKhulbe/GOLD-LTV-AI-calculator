@@ -313,10 +313,10 @@ async def fetch_live_gold_price_sar_karats() -> Tuple[dict, float, float, str]:
 async def build_gold_insights(tenure_months: int) -> GoldInsights:
     """
     Full pipeline → returns a GoldInsights object with everything the
-    dashboard needs. All price values are in AED per gram.
+    dashboard needs. All price values are in SAR per gram.
     """
-    # Live price — AED for loan calc, SAR for chart display
-    live_aed_per_gram, live_usd_per_oz, _ = await fetch_live_gold_price_aed()
+    # Live price — SAR for both calc and display
+    _, live_usd_per_oz, _ = await fetch_live_gold_price_aed()
     live_sar_per_gram = round((live_usd_per_oz / TROY_OZ_TO_GRAM) * SAR_PER_USD, 4)
 
     # Load real history (values are USD/oz from source JSON)
@@ -333,23 +333,22 @@ async def build_gold_insights(tenure_months: int) -> GoldInsights:
     # Predict in USD/oz space (models trained on USD/oz), anchor with live USD/oz
     predicted, pct_change, trend = _predict(models, tenure_months, live_usd_per_oz)
 
-    # Capture tenure-end price in AED before converting predicted list to SAR
+    # Capture tenure-end price in SAR before converting predicted list
     if predicted:
         end_usd_oz = predicted[-1].price_aed_per_gram   # still USD/oz at this point
-        predicted_end_price_aed = round((end_usd_oz / TROY_OZ_TO_GRAM) * AED_PER_USD, 2)
+        predicted_end_price_sar = round((end_usd_oz / TROY_OZ_TO_GRAM) * SAR_PER_USD, 2)
     else:
-        predicted_end_price_aed = live_aed_per_gram
+        predicted_end_price_sar = live_sar_per_gram
 
     # Convert predicted prices from USD/oz → SAR/gram for chart display
     for p in predicted:
         p.price_aed_per_gram = round((p.price_aed_per_gram / TROY_OZ_TO_GRAM) * SAR_PER_USD, 2)
 
     return GoldInsights(
-        live_price_aed_per_gram=live_aed_per_gram,
         live_price_sar_per_gram=live_sar_per_gram,
         historical_prices=display_history,
         predicted_prices=predicted,
         predicted_change_pct=pct_change,
         trend=trend,
-        predicted_end_price_aed_per_gram=predicted_end_price_aed,
+        predicted_end_price_sar_per_gram=predicted_end_price_sar,
     )
