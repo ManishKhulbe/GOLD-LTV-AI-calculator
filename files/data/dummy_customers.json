@@ -1,0 +1,182 @@
+{
+  "784-1985-1234567-1": {
+    "customer_name": "Ahmed Al-Mansoori",
+    "emirates_id": "784-1985-1234567-1",
+    "nationality": "UAE",
+    "mobile": "+971 55 204 9935",
+    "customer_type": "Existing",
+    "risk_category": "A+",
+    "cibil_score": 780
+  },
+  "784-1990-2345678-2": {
+    "customer_name": "Hassan Al-Nahyan",
+    "emirates_id": "784-1990-2345678-2",
+    "nationality": "Filipino",
+    "mobile": "+971 55 658 7873",
+    "customer_type": "Existing",
+    "risk_category": "A",
+    "cibil_score": 758
+  },
+  "784-1978-3456789-3": {
+    "customer_name": "Sara Al-Rashidi",
+    "emirates_id": "784-1978-3456789-3",
+    "nationality": "Indian",
+    "mobile": "+971 56 452 5333",
+    "customer_type": "Existing",
+    "risk_category": "A",
+    "cibil_score": 741
+  },
+  "784-1995-4567890-4": {
+    "customer_name": "Layla Williams",
+    "emirates_id": "784-1995-4567890-4",
+    "nationality": "UAE",
+    "mobile": "+971 55 171 1750",
+    "customer_type": "New",
+    "risk_category": "C",
+    "cibil_score": 619
+  },
+  "784-1982-5678901-5": {
+    "customer_name": "Fatima Mehta",
+    "emirates_id": "784-1982-5678901-5",
+    "nationality": "UAE",
+    "mobile": "+971 53 384 8428",
+    "customer_type": "New",
+    "risk_category": "B",
+    "cibil_score": 658
+  },
+  "784-1970-6789012-6": {
+    "customer_name": "Layla Al-Hamdan",
+    "emirates_id": "784-1970-6789012-6",
+    "nationality": "Filipino",
+    "mobile": "+971 52 818 2169",
+    "customer_type": "Existing",
+    "risk_category": "B+",
+    "cibil_score": 703
+  },
+  "784-2000-7890123-7": {
+    "customer_name": "Mohammed Gupta",
+    "emirates_id": "784-2000-7890123-7",
+    "nationality": "Indian",
+    "mobile": "+971 53 374 2084",
+    "customer_type": "Existing",
+    "risk_category": "B",
+    "cibil_score": 643
+  },
+  "784-1988-8901234-8": {
+    "customer_name": "Hessa Khan",
+    "emirates_id": "784-1988-8901234-8",
+    "nationality": "British",
+    "mobile": "+971 53 470 4593",
+    "customer_type": "Existing",
+    "risk_category": "B+",
+    "cibil_score": 696
+  },
+  "784-1975-9012345-9": {
+    "customer_name": "Sunita Mehta",
+    "emirates_id": "784-1975-9012345-9",
+    "nationality": "UAE",
+    "mobile": "+971 55 838 2876",
+    "customer_type": "Existing",
+    "risk_category": "A",
+    "cibil_score": 749
+  },
+  "784-1993-0123456-1": {
+    "customer_name": "Arjun Williams",
+    "emirates_id": "784-1993-0123456-1",
+    "nationality": "UAE",
+    "mobile": "+971 51 482 3646",
+    "customer_type": "New",
+    "risk_category": "C",
+    "cibil_score": 599
+  },
+  "784-1965-1357924-2": {
+    "customer_name": "Emily Patel",
+    "emirates_id": "784-1965-1357924-2",
+    "nationality": "Pakistani",
+    "mobile": "+971 50 214 6947",
+    "customer_type": "New",
+    "risk_category": "B+",
+    "cibil_score": 713
+  },
+  "784-1998-2468013-3": {
+    "customer_name": "Fatima Al-Mansoori",
+    "emirates_id": "784-1998-2468013-3",
+    "nationality": "UAE",
+    "mobile": "+971 54 180 2403",
+    "customer_type": "New",
+    "risk_category": "C",
+    "cibil_score": 633
+  },
+  "784-1983-3579124-4": {
+    "customer_name": "Sunita Gupta",
+    "emirates_id": "784-1983-3579124-4",
+    "nationality": "UAE",
+    "mobile": "+971 51 775 8787",
+    "customer_type": "New",
+    "risk_category": "B",
+    "cibil_score": 644
+  },
+  "784-1972-4680235-5": {
+    "customer_name": "Emily Singh",
+    "emirates_id": "784-1972-4680235-5",
+    "nationality": "UAE",
+    "mobile": "+971 54 873 4295",
+    "customer_type": "Existing",
+    "risk_category": "D",
+    "cibil_score": 384
+  },
+  "784-2002-5791346-6": {
+    "customer_name": "James Williams",
+    "emirates_id": "784-2002-5791346-6",
+    "nationality": "Pakistani",
+    "mobile": "+971 51 903 8749",
+    "customer_type": "Existing",
+    "risk_category": "A",
+    "cibil_score": 728
+  },
+  "784-1980-6802457-7": {
+    "customer_name": "Hessa Al-Zaabi",
+    "emirates_id": "784-1980-6802457-7",
+    "nationality": "UAE",
+    "mobile": "+971 53 355 2235",
+    "customer_type": "Existing",
+    "risk_category": "A+",
+    "cibil_score": 897
+  },
+  "784-1969-7913568-8": {
+    "customer_name": "Ravi Sharma",
+    "emirates_id": "784-1969-7913568-8",
+    "nationality": "Indian",
+    "mobile": "+971 55 848 8973",
+    "customer_type": "Existing",
+    "risk_category": "A",
+    "cibil_score": 744
+  },
+  "784-1991-8024679-9": {
+    "customer_name": "Arjun Al-Zaabi",
+    "emirates_id": "784-1991-8024679-9",
+    "nationality": "UAE",
+    "mobile": "+971 54 182 4044",
+    "customer_type": "New",
+    "risk_category": "B+",
+    "cibil_score": 712
+  },
+  "784-1987-9135780-1": {
+    "customer_name": "Fatima Singh",
+    "emirates_id": "784-1987-9135780-1",
+    "nationality": "UAE",
+    "mobile": "+971 54 352 1651",
+    "customer_type": "Existing",
+    "risk_category": "A+",
+    "cibil_score": 777
+  },
+  "784-1976-0246891-2": {
+    "customer_name": "Aisha Kumar",
+    "emirates_id": "784-1976-0246891-2",
+    "nationality": "Indian",
+    "mobile": "+971 56 174 1152",
+    "customer_type": "Existing",
+    "risk_category": "A",
+    "cibil_score": 745
+  }
+}

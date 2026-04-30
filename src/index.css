@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  /* background-color: #121826; */
+  /* background-image: radial-gradient(#2f3848 0.85px, transparent 0.85px); */
+  /* background-size: 14px 14px; */
+}
