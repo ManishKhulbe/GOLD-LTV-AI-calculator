@@ -217,19 +217,17 @@ function CalculatorScreen({
         </form>
 
         <aside className="h-fit rounded-xl border border-[#e5e7eb] bg-white p-5">
-          <h3 className="text-[34px] font-medium text-[#1f2937]">System Information</h3>
-          <div className="mt-4 border-t border-[#e5e7eb]" />
+          <div className="border-t border-[#e5e7eb]" />
 
           <div className="mt-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9ca3af]">Live Gold Rate</p>
-            <p className="mt-1 text-[42px] font-semibold text-[#111827]">
+            <p className="mt-1 text-[26px] font-semibold text-[#111827]">
               {isRateLoading || !liveGoldRates['24K']
-                ? 'SAR ---.--'
-                : `SAR ${Number(liveGoldRates['24K']).toFixed(2)}`}{' '}
-              /g
+                ? 'SAR ---.-- /g'
+                : `SAR ${Number(liveGoldRates['24K']).toFixed(2)} /g`}
             </p>
             <div className="mt-3 space-y-1.5">
-              {['24K', '22K', '21K', '20K', '18K', '16K', '14K', '10K'].map((karat) => (
+              {['24K', '22K', '21K', '18K', '14K'].map((karat) => (
                 <p key={karat} className="flex items-center justify-between text-sm text-[#4b5563]">
                   <span>{karat}</span>
                   <span className="font-medium text-[#111827]">
@@ -243,13 +241,6 @@ function CalculatorScreen({
             </div>
           </div>
 
-          <div className="mt-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9ca3af]">System Status</p>
-            <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-[#16a34a]">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#16a34a]" />
-              Ready
-            </p>
-          </div>
         </aside>
       </div>
     </section>
@@ -264,12 +255,26 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
   const risk = r.risk_insights ?? {}
   const loanItems = history.loan_items ?? []
 
-  const decisionColor =
-    r.system_decision === 'Pre-Approved'
-      ? 'bg-[#e8fff1] text-[#20a35a]'
-      : r.system_decision === 'Manual Review'
-        ? 'bg-[#fff8e8] text-[#b07d1e]'
-        : 'bg-[#fff1f1] text-[#c02b2b]'
+  const [emiMode, setEmiMode] = useState('monthly')
+  const [emiMonths, setEmiMonths] = useState(String(r.suggested_tenure_months ?? 12))
+  const [emiRate, setEmiRate] = useState('')
+
+  const principal = r.eligible_loan_amount_sar ?? 0
+  const parsedRate = parseFloat(emiRate)
+  const parsedMonths = parseInt(emiMonths, 10)
+
+  const emiResult = (() => {
+    if (!principal || !parsedRate || parsedRate <= 0 || !parsedMonths) return null
+    const monthlyRate = parsedRate / 100 / 12
+    if (emiMode === 'monthly') {
+      if (monthlyRate === 0) return principal / parsedMonths
+      const emi = principal * monthlyRate * Math.pow(1 + monthlyRate, parsedMonths) / (Math.pow(1 + monthlyRate, parsedMonths) - 1)
+      return emi
+    } else {
+      return principal * (1 + (parsedRate / 100) * (parsedMonths / 12))
+    }
+  })()
+
 
   const riskLabel = risk.user_risk_label ?? 'N/A'
   const riskBadgeColor =
@@ -307,7 +312,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
             </div>
 
             <div className="w-[178px] rounded-xl border border-[#243149] bg-[#0e1c33]/90 px-4 py-3">
-              <p className="text-center text-[13px] text-[#c0cade]">CIBIL Score</p>
+              <p className="text-center text-[13px] text-[#c0cade]">SIMAH Score</p>
               <CibilGauge score={r.cibil_score ?? 780} label={r.cibil_label ?? 'Excellent'} />
             </div>
           </div>
@@ -347,14 +352,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
         </div>
 
         <div className="rounded-xl border border-[#d8dce3] bg-white p-3">
-          <p className="text-sm font-semibold text-[#4b5563]">System Decision</p>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-xs text-[#8b95a7]">Recommendation</span>
-            <span className={`rounded-md px-2 py-1 text-[10px] ${decisionColor}`}>
-              {r.system_decision ?? '—'}
-            </span>
-          </div>
-          <div className="mt-3 space-y-2 text-sm text-[#4b5563]">
+          <div className="space-y-2 text-sm text-[#4b5563]">
             <p className="flex justify-between">
               <span>Recommended Amount</span>
               <span className="font-semibold">{formatSar(r.eligible_loan_amount_sar)}</span>
@@ -366,6 +364,65 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
               </span>
             </p>
           </div>
+          <div className="mt-4 border-t border-[#e5e7eb] pt-3">
+            <p className="mb-2 text-xs font-semibold text-[#4b5563]">EMI Calculator</p>
+            <div className="flex rounded-lg border border-[#e5e7eb] overflow-hidden text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setEmiMode('monthly')}
+                className={`flex-1 py-1.5 transition-colors ${emiMode === 'monthly' ? 'bg-[#071c44] text-white' : 'bg-white text-[#6b7280] hover:bg-[#f9fafb]'}`}
+              >
+                Monthly EMI
+              </button>
+              <button
+                type="button"
+                onClick={() => setEmiMode('upfront')}
+                className={`flex-1 py-1.5 transition-colors ${emiMode === 'upfront' ? 'bg-[#071c44] text-white' : 'bg-white text-[#6b7280] hover:bg-[#f9fafb]'}`}
+              >
+                Bullet Payment
+              </button>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-[10px] text-[#9aa1af]">Months</label>
+                <select
+                  value={emiMonths}
+                  onChange={(e) => setEmiMonths(e.target.value)}
+                  className="w-full rounded-md border border-[#d3d8e0] px-2 py-1.5 text-xs text-[#374151] focus:border-[#071c44] focus:outline-none"
+                >
+                  {[3, 6, 12, 18, 24, 36].map((m) => (
+                    <option key={m} value={m}>{m} Months</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] text-[#9aa1af]">Annual Rate (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="e.g. 12"
+                  value={emiRate}
+                  onChange={(e) => setEmiRate(e.target.value)}
+                  className="w-full rounded-md border border-[#d3d8e0] px-2 py-1.5 text-xs text-[#374151] focus:border-[#071c44] focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className={`mt-2 rounded-lg p-2.5 ${emiResult != null ? 'bg-[#f0f4ff] border border-[#c7d4f5]' : 'bg-[#f9fafb] border border-[#e5e7eb]'}`}>
+              {emiResult != null ? (
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-[#6b7280]">
+                    {emiMode === 'monthly' ? `Monthly EMI · ${emiMonths} payments` : `Bullet Payment · due at ${emiMonths}-month end`}
+                  </p>
+                  <p className="text-sm font-bold text-[#071c44]">{formatSar(emiResult)}</p>
+                </div>
+              ) : (
+                <p className="text-center text-[10px] text-[#9aa1af]">Enter rate to calculate</p>
+              )}
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={() => setActiveScreen('calculator')}
