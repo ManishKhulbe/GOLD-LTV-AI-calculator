@@ -268,11 +268,24 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
     const monthlyRate = parsedRate / 100 / 12
     if (emiMode === 'monthly') {
       if (monthlyRate === 0) return principal / parsedMonths
-      const emi = principal * monthlyRate * Math.pow(1 + monthlyRate, parsedMonths) / (Math.pow(1 + monthlyRate, parsedMonths) - 1)
-      return emi
+      return principal * monthlyRate * Math.pow(1 + monthlyRate, parsedMonths) / (Math.pow(1 + monthlyRate, parsedMonths) - 1)
     } else {
       return principal * (1 + (parsedRate / 100) * (parsedMonths / 12))
     }
+  })()
+
+  const amortizationSchedule = (() => {
+    if (emiMode !== 'monthly' || !emiResult || !principal || !parsedMonths) return []
+    const monthlyRate = parsedRate / 100 / 12
+    const schedule = []
+    let balance = principal
+    for (let m = 1; m <= parsedMonths; m++) {
+      const interest = balance * monthlyRate
+      const principalPaid = emiResult - interest
+      balance = Math.max(balance - principalPaid, 0)
+      schedule.push({ month: m, emi: emiResult, interest, principalPaid, balance })
+    }
+    return schedule
   })()
 
 
@@ -290,7 +303,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
       </p>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_290px]">
-        <div className="rounded-xl border border-[#1f2d4a] bg-[radial-gradient(circle_at_top,#0b1c42,#02091a_60%)] p-4 text-white shadow-[inset_0_0_40px_rgba(65,105,225,0.12)]">
+        <div className="flex h-[580px] flex-col rounded-xl border border-[#1f2d4a] bg-[radial-gradient(circle_at_top,#0b1c42,#02091a_60%)] p-4 text-white shadow-[inset_0_0_40px_rgba(65,105,225,0.12)]">
           <div className="flex items-start justify-between">
             <span className={`rounded-full border border-[#2d3f60] bg-[#0c1f3a] px-3 py-1 text-[11px] font-semibold ${riskBadgeColor}`}>
               ● {riskLabel} Category
@@ -300,7 +313,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
             </div>
           </div>
 
-          <div className="mt-6 flex items-end justify-between gap-4">
+          <div className="mt-auto flex items-end justify-between gap-4">
             <div>
               <p className="text-[20px] font-semibold tracking-wide text-[#ecd39f]">RECOMMENDED LTV</p>
               <div className="mt-1 flex items-end gap-3">
@@ -351,7 +364,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
           })()}
         </div>
 
-        <div className="rounded-xl border border-[#d8dce3] bg-white p-3">
+        <div className="flex h-[580px] flex-col overflow-y-auto rounded-xl border border-[#d8dce3] bg-white p-3">
           <div className="space-y-2 text-sm text-[#4b5563]">
             <p className="flex justify-between">
               <span>Recommended Amount</span>
@@ -421,6 +434,37 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                 <p className="text-center text-[10px] text-[#9aa1af]">Enter rate to calculate</p>
               )}
             </div>
+
+            {emiMode === 'monthly' && amortizationSchedule.length > 0 && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#9aa1af]">Repayment Schedule</p>
+                <div className="max-h-[220px] overflow-y-auto rounded-md border border-[#e5e7eb]">
+                  <table className="w-full text-[10px]">
+                    <thead className="sticky top-0 bg-[#f3f4f6] text-[#6b7280]">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left font-semibold">Mo.</th>
+                        <th className="px-2 py-1.5 text-right font-semibold">EMI</th>
+                        <th className="px-2 py-1.5 text-right font-semibold">Principal</th>
+                        <th className="px-2 py-1.5 text-right font-semibold">Interest</th>
+                        <th className="px-2 py-1.5 text-right font-semibold">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {amortizationSchedule.map((row) => (
+                        <tr key={row.month} className="border-t border-[#f0f0f0] even:bg-[#fafafa]">
+                          <td className="px-2 py-1.5 text-[#374151]">{row.month}</td>
+                          <td className="px-2 py-1.5 text-right text-[#374151]">{row.emi.toFixed(0)}</td>
+                          <td className="px-2 py-1.5 text-right font-medium text-[#16a34a]">{row.principalPaid.toFixed(0)}</td>
+                          <td className="px-2 py-1.5 text-right text-[#dc2626]">{row.interest.toFixed(0)}</td>
+                          <td className="px-2 py-1.5 text-right text-[#374151]">{row.balance.toFixed(0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-1 text-[9px] text-[#9aa1af]">Principal (green) ↑ each month · Interest (red) ↓ each month · All values in SAR</p>
+              </div>
+            )}
           </div>
 
           <button
