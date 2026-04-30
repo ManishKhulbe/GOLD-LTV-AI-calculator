@@ -99,10 +99,11 @@ class GoldPricePoint(BaseModel):
 class GoldInsights(BaseModel):
     live_price_aed_per_gram: float            # AED — used for loan valuation calc
     live_price_sar_per_gram: float            # SAR — used for chart display
-    historical_prices: List[GoldPricePoint]   # last 12 months, SAR/gram
+    historical_prices: List[GoldPricePoint]   # last 3 months, SAR/gram
     predicted_prices: List[GoldPricePoint]    # next tenure months, SAR/gram
     predicted_change_pct: float               # % change over tenure
     trend: str                                # "RISING" | "FALLING" | "STABLE"
+    predicted_end_price_aed_per_gram: float   # AED/gram at tenure end — for future loan calc
 
 
 class RiskInsights(BaseModel):
@@ -131,6 +132,8 @@ class LoanCalculationResponse(BaseModel):
     recommended_ltv_pct: float
     gold_valuation_aed: float
     eligible_loan_amount_aed: float
+    future_gold_valuation_aed: float
+    future_eligible_loan_amount_aed: float
     suggested_tenure_months: int
     cibil_score: int
     cibil_label: str

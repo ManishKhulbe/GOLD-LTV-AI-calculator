@@ -321,6 +321,34 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
             <MetricChip label="Gold Valuation" value={formatAed(r.gold_valuation_aed)} />
             <MetricChip label="Eligible Loan Amount" value={formatAed(r.eligible_loan_amount_aed)} />
           </div>
+          {r.future_eligible_loan_amount_aed != null && r.eligible_loan_amount_aed != null && (() => {
+            const delta = r.future_eligible_loan_amount_aed - r.eligible_loan_amount_aed
+            const deltaPct = r.eligible_loan_amount_aed !== 0
+              ? ((delta / r.eligible_loan_amount_aed) * 100).toFixed(1)
+              : '0.0'
+            const rising = delta >= 0
+            return (
+              <div className="mt-3 rounded-lg border border-dashed border-[#f2cf84]/40 bg-[#0f1f38] p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs text-[#c8a84b]">Future-Adjusted Loan Estimate</p>
+                    <p className="mt-1 text-lg font-semibold text-[#f2cf84]">{formatAed(r.future_eligible_loan_amount_aed)}</p>
+                    <p className="mt-0.5 text-[10px] text-[#6b839f]">
+                      Based on predicted gold price at {r.suggested_tenure_months}-month tenure end
+                    </p>
+                  </div>
+                  <div className={`flex shrink-0 flex-col items-end gap-0.5 rounded-md px-2 py-1 ${rising ? 'bg-[#0e3a20]' : 'bg-[#3a0e0e]'}`}>
+                    <span className={`text-base font-bold leading-none ${rising ? 'text-[#5ece7d]' : 'text-[#f87171]'}`}>
+                      {rising ? '▲' : '▼'}
+                    </span>
+                    <span className={`text-xs font-semibold ${rising ? 'text-[#5ece7d]' : 'text-[#f87171]'}`}>
+                      {rising ? '+' : ''}{deltaPct}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
         <div className="rounded-xl border border-[#d8dce3] bg-white p-3">
@@ -348,12 +376,6 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
               {r.remarks}
             </div>
           ) : null}
-          <button className="mt-3 w-full rounded-md bg-[#071c44] py-2 text-sm font-medium text-white">
-            Proceed to Approval
-          </button>
-          <button className="mt-2 w-full rounded-md bg-[#f5d785] py-2 text-sm font-medium text-[#5a4a1e]">
-            Review Manually
-          </button>
           <button
             type="button"
             onClick={() => setActiveScreen('calculator')}
@@ -455,37 +477,41 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
               </p>
             </div>
           </div>
-          <div className="rounded-lg border border-[#22314a] bg-[#0a1830] p-2">
-            <table className="w-full text-left text-xs">
-              <thead className="text-[#9fb0c7]">
-                <tr>
-                  <th className="px-2 py-2">Loan ID</th>
-                  <th className="px-2 py-2">Tenure</th>
-                  <th className="px-2 py-2">Status</th>
-                  <th className="px-2 py-2">Missed EMIs</th>
-                  <th className="px-2 py-2">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loanItems.length > 0 ? (
-                  loanItems.map((row) => (
-                    <tr key={row.loan_id} className="border-t border-[#1b2a43] text-[#e8edf7]">
-                      <td className="px-2 py-2">{row.loan_id}</td>
-                      <td className="px-2 py-2">{row.tenure_months} Mos</td>
-                      <td className="px-2 py-2">{row.status}</td>
-                      <td className="px-2 py-2">{row.missed_emis}</td>
-                      <td className="px-2 py-2">{formatAed(row.amount)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr className="border-t border-[#1b2a43] text-[#e8edf7]">
-                    <td colSpan={5} className="px-2 py-4 text-center text-[#9db0d1]">
-                      No loan history available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="rounded-lg border border-[#22314a] bg-[#0a1830] p-3">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#9db0d1]">Loan History</p>
+            {loanItems.length > 0 ? (
+              <div className="space-y-2">
+                {loanItems.map((row) => {
+                  const statusColor =
+                    row.status === 'ACTIVE'    ? 'bg-[#0e3a20] text-[#5ece7d] ring-1 ring-[#5ece7d]/30' :
+                    row.status === 'DEFAULTED' ? 'bg-[#3a0e0e] text-[#f87171] ring-1 ring-[#f87171]/30' :
+                                                 'bg-[#1b2a43] text-[#9fb0c7] ring-1 ring-[#9fb0c7]/20'
+                  return (
+                    <div key={row.loan_id} className="flex items-center justify-between rounded-md border border-[#1b2a43] bg-[#071224] px-3 py-2.5 hover:border-[#2d4060] transition-colors">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium text-[#dce8ff]">{row.loan_id}</p>
+                        <p className="mt-0.5 text-[10px] text-[#6b839f]">{row.tenure_months} Months · {row.missed_emis} missed EMI{row.missed_emis !== 1 ? 's' : ''}</p>
+                      </div>
+                      <div className="ml-3 flex flex-col items-end gap-1 shrink-0">
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusColor}`}>
+                          {row.status}
+                        </span>
+                        <p className="text-[10px] font-medium text-[#c8d8ef]">{formatAed(row.amount)}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <svg className="mb-3 opacity-30" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9db0d1" strokeWidth="1.5">
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <path d="M2 10h20" />
+                </svg>
+                <p className="text-sm font-medium text-[#4a607a]">No prior loans</p>
+                <p className="mt-1 text-xs text-[#354f6a]">This customer has no loan history on record</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -674,7 +700,7 @@ function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
           )}
 
           {/* Historical: invisible wide hit-area strips per day for hover */}
-          {histPoints.map((p, idx) => (
+          {histPoints.map((_p, idx) => (
             <rect
               key={idx}
               x={xPos(idx) - (gW / (allPoints.length - 1)) / 2}

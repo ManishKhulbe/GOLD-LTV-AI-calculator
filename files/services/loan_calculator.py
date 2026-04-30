@@ -96,10 +96,12 @@ def calculate_ltv_and_loan(
     """
 
     # ── Gold valuation ────────────────────────────────────────────────────────
-    purity         = CARAT_PURITY[carat.value]
-    pure_grams     = gold_weight_grams * purity
-    live_price     = gold_insights.live_price_aed_per_gram
-    gold_valuation = round(pure_grams * live_price, 2)
+    purity              = CARAT_PURITY[carat.value]
+    pure_grams          = gold_weight_grams * purity
+    live_price          = gold_insights.live_price_aed_per_gram
+    gold_valuation      = round(pure_grams * live_price, 2)
+    future_price        = gold_insights.predicted_end_price_aed_per_gram
+    future_gold_valuation = round(pure_grams * future_price, 2)
 
     # ── Individual factors ────────────────────────────────────────────────────
     carat_mult  = CARAT_MULTIPLIERS[carat.value]
@@ -122,7 +124,8 @@ def calculate_ltv_and_loan(
     )
     final_ltv = round(min(final_ltv, BASE_LTV), 4)  # never exceed base ceiling
 
-    eligible_amount = round(gold_valuation * final_ltv, 2)
+    eligible_amount        = round(gold_valuation * final_ltv, 2)
+    future_eligible_amount = round(future_gold_valuation * final_ltv * 0.97, 2)  # 3% safety buffer
 
     # ── LTV breakdown (deltas from base) ──────────────────────────────────────
     breakdown = LTVBreakdown(
@@ -149,6 +152,8 @@ def calculate_ltv_and_loan(
         recommended_ltv_pct=round(final_ltv * 100, 2),
         gold_valuation_aed=gold_valuation,
         eligible_loan_amount_aed=eligible_amount,
+        future_gold_valuation_aed=future_gold_valuation,
+        future_eligible_loan_amount_aed=future_eligible_amount,
         suggested_tenure_months=tenure_months,
         cibil_score=customer.cibil_score,
         cibil_label=cibil_label,

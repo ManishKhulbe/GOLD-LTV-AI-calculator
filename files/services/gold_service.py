@@ -6,9 +6,9 @@ Prediction pipeline:
   2. Fit TWO models on the full history:
        a) Polynomial (degree-3) regression  → captures long-run trend
        b) Linear regression on last 90 days → captures recent momentum
-  3. Blend the two forecasts: 35% long-trend + 65% recent-momentum
-     Rationale: for short loan tenures (6–36 months) recent momentum
-     dominates; the long-run trend prevents wild extrapolation.
+  3. Blend the two forecasts: 65% long-trend + 35% recent-momentum
+     Rationale: gold follows multi-year macro cycles; the 20-year polynomial
+     dominates to prevent a short-term dip from dragging the full forecast down.
   4. Add calibrated noise so the chart looks realistic, not perfectly smooth.
   5. Live price still comes from gold-api.com (XAU → USD → AED/gram).
      Historical + predicted prices are normalised to AED per gram throughout.
@@ -114,8 +114,10 @@ def _fit_models(dates: np.ndarray, prices: np.ndarray) -> dict:
             x_n = (x_ord - x_min) / (x_max - x_min)
             return poly(x_n)
 
-    # ── B: Recent-momentum linear ──────────────────────────────────────────
-    cutoff    = dates[-1] - 90
+    # ── B: Recent-momentum linear (1-year window) ──────────────────────────
+    # 90-day window is too sensitive to short-term dips; 365 days captures
+    # a full cycle and produces a directionally stable momentum estimate.
+    cutoff    = dates[-1] - 365
     mask      = dates >= cutoff
     recent_x  = dates[mask]
     recent_y  = prices[mask]
@@ -149,7 +151,7 @@ def _predict(
 
     Blending strategy
     -----------------
-    blend = 0.65 × recent_momentum  +  0.35 × long_run_trend
+    blend = 0.35 × recent_momentum  +  0.65 × long_run_trend
 
     The blend is then **anchored** so that day-0 exactly matches today's live
     price. This prevents a jump at the seam between the historical chart and
@@ -160,8 +162,8 @@ def _predict(
     """
     np.random.seed(99)
 
-    W_RECENT = 0.65
-    W_LONG   = 0.35
+    W_RECENT = 0.35
+    W_LONG   = 0.65
 
     last_ord = models["last_date"]
 
@@ -331,7 +333,14 @@ async def build_gold_insights(tenure_months: int) -> GoldInsights:
     # Predict in USD/oz space (models trained on USD/oz), anchor with live USD/oz
     predicted, pct_change, trend = _predict(models, tenure_months, live_usd_per_oz)
 
-    # Convert predicted prices from USD/oz → SAR/gram
+    # Capture tenure-end price in AED before converting predicted list to SAR
+    if predicted:
+        end_usd_oz = predicted[-1].price_aed_per_gram   # still USD/oz at this point
+        predicted_end_price_aed = round((end_usd_oz / TROY_OZ_TO_GRAM) * AED_PER_USD, 2)
+    else:
+        predicted_end_price_aed = live_aed_per_gram
+
+    # Convert predicted prices from USD/oz → SAR/gram for chart display
     for p in predicted:
         p.price_aed_per_gram = round((p.price_aed_per_gram / TROY_OZ_TO_GRAM) * SAR_PER_USD, 2)
 
@@ -342,4 +351,5 @@ async def build_gold_insights(tenure_months: int) -> GoldInsights:
         predicted_prices=predicted,
         predicted_change_pct=pct_change,
         trend=trend,
+        predicted_end_price_aed_per_gram=predicted_end_price_aed,
     )
