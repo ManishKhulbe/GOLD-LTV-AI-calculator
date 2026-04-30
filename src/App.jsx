@@ -89,37 +89,37 @@ function App() {
 
   return (
     <main className="min-h-screen p-4 md:p-6">
-        <header className="flex items-center justify-between border-b border-[#e5e7eb] px-6 py-4">
-          <p className="text-sm font-semibold text-[#1f2937]">Finance House Dubai</p>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="text-[#6b7280] transition hover:text-[#111827]"
-            >
-              <span className="text-[15px]">◦</span>
-            </button>
-            <button type="button" aria-label="Settings" className="text-[#6b7280] transition hover:text-[#111827]">
-              <span className="text-[15px]">⚙</span>
-            </button>
-            <div className="h-8 w-8 rounded-full bg-[linear-gradient(145deg,#0b1220,#f4d9a4)]" />
-          </div>
-        </header>
+      <header className="flex items-center justify-between border-b border-[#e5e7eb] px-6 py-4">
+        <p className="text-sm font-semibold text-[#1f2937]">Finance House Dubai</p>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            aria-label="Notifications"
+            className="text-[#6b7280] transition hover:text-[#111827]"
+          >
+            <span className="text-[15px]">◦</span>
+          </button>
+          <button type="button" aria-label="Settings" className="text-[#6b7280] transition hover:text-[#111827]">
+            <span className="text-[15px]">⚙</span>
+          </button>
+          <div className="h-8 w-8 rounded-full bg-[linear-gradient(145deg,#0b1220,#f4d9a4)]" />
+        </div>
+      </header>
 
-        {activeScreen === 'calculator' ? (
-          <CalculatorScreen
-            form={form}
-            handleChange={handleChange}
-            handleCalculate={handleCalculate}
-            handleReset={handleReset}
-            isSubmitting={isSubmitting}
-            statusMessage={statusMessage}
-            isRateLoading={isRateLoading}
-            liveGoldRates={liveGoldRates}
-          />
-        ) : (
-          <SummaryScreen setActiveScreen={setActiveScreen} valuationResult={valuationResult} />
-        )}
+      {activeScreen === 'calculator' ? (
+        <CalculatorScreen
+          form={form}
+          handleChange={handleChange}
+          handleCalculate={handleCalculate}
+          handleReset={handleReset}
+          isSubmitting={isSubmitting}
+          statusMessage={statusMessage}
+          isRateLoading={isRateLoading}
+          liveGoldRates={liveGoldRates}
+        />
+      ) : (
+        <SummaryScreen setActiveScreen={setActiveScreen} valuationResult={valuationResult} />
+      )}
     </main>
   )
 }
@@ -410,7 +410,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
         />
       </div>
 
-      <PredictedLtvGoldTrendChart />
+      <PredictedLtvGoldTrendChart goldInsights={gold} />
 
       <div className="mt-4 rounded-xl border border-[#1d2b46] bg-[linear-gradient(135deg,#071430,#04101f)] p-4 text-white">
         <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -493,93 +493,277 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
   )
 }
 
-function PredictedLtvGoldTrendChart() {
-  const trendData = [
-    { month: 1, price: 540.5 },
-    { month: 2, price: 546.8 },
-    { month: 3, price: 553.4 },
-    { month: 4, price: 560.1 },
-    { month: 5, price: 567.2 },
-    { month: 6, price: 573.9 },
-    { month: 7, price: 581.4 },
-    { month: 8, price: 589.1 },
-    { month: 9, price: 596.7 },
-    { month: 10, price: 605.3 },
-    { month: 11, price: 613.8 },
-    { month: 12, price: 622.6 },
-  ]
-  const [hoverIndex, setHoverIndex] = useState(trendData.length - 1)
+function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
+  const historicalRaw = goldInsights.historical_prices ?? []
+  const predictedRaw = goldInsights.predicted_prices ?? []
+  const livePrice = goldInsights.live_price_sar_per_gram ?? goldInsights.live_price_aed_per_gram ?? null
+
+  const fmtLabel = (dateStr) => {
+    const d = new Date(dateStr + 'T00:00:00')
+    return d.toLocaleString('en', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2)
+  }
+
+  const histPoints = historicalRaw.map((p) => ({
+    label: fmtLabel(p.date),
+    date: p.date,
+    price: p.price_aed_per_gram,
+    type: 'historical',
+  }))
+
+  const nowLabel = (() => {
+    const d = new Date()
+    return d.toLocaleString('en', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2)
+  })()
+
+  const currentPoint = livePrice != null
+    ? [{ label: nowLabel, price: livePrice, type: 'current' }]
+    : []
+
+  const predPoints = predictedRaw.map((p) => ({
+    label: fmtLabel(p.date),
+    price: p.price_aed_per_gram,
+    type: 'predicted',
+  }))
+
+  const allPoints = [...histPoints, ...currentPoint, ...predPoints]
+
+  const currentIdx = allPoints.findIndex((p) => p.type === 'current')
+  const defaultHover = currentIdx >= 0 ? currentIdx : Math.max(0, allPoints.length - 1)
+  const [hoverIndex, setHoverIndex] = useState(defaultHover)
 
   const width = 920
-  const height = 250
-  const pad = { top: 16, right: 18, bottom: 42, left: 72 }
-  const graphW = width - pad.left - pad.right
-  const graphH = height - pad.top - pad.bottom
+  const height = 270
+  const pad = { top: 24, right: 24, bottom: 52, left: 72 }
+  const gW = width - pad.left - pad.right
+  const gH = height - pad.top - pad.bottom
 
-  const minY = Math.min(...trendData.map((d) => d.price)) - 8
-  const maxY = Math.max(...trendData.map((d) => d.price)) + 8
+  if (allPoints.length < 2) {
+    return (
+      <div className="mt-4 rounded-xl border border-[#1d2b46] bg-[linear-gradient(135deg,#071430,#04101f)] p-4">
+        <p className="text-sm font-semibold text-[#dce8ff]">Gold Price — Historical &amp; Forecast</p>
+        <p className="mt-6 text-center text-xs text-[#9fb0c7]">No chart data available</p>
+      </div>
+    )
+  }
 
-  const x = (idx) => pad.left + (idx / (trendData.length - 1)) * graphW
-  const y = (val) => pad.top + ((maxY - val) / (maxY - minY)) * graphH
+  const prices = allPoints.map((p) => p.price)
+  const minY = Math.min(...prices) * 0.975
+  const maxY = Math.max(...prices) * 1.025
 
-  const path = trendData.map((d, i) => `${x(i)},${y(d.price)}`).join(' ')
-  const hovered = trendData[hoverIndex]
+  const xPos = (i) => pad.left + (i / (allPoints.length - 1)) * gW
+  const yPos = (val) => pad.top + ((maxY - val) / (maxY - minY)) * gH
+
+  const histEndIdx = currentIdx >= 0 ? currentIdx : histPoints.length - 1
+  const predStartIdx = currentIdx >= 0 ? currentIdx : histPoints.length
+
+  const histPath = allPoints
+    .slice(0, histEndIdx + 1)
+    .map((p, i) => `${xPos(i)},${yPos(p.price)}`)
+    .join(' ')
+
+  const predPath = allPoints
+    .slice(predStartIdx)
+    .map((p, i) => `${xPos(predStartIdx + i)},${yPos(p.price)}`)
+    .join(' ')
+
+  const hovered = allPoints[hoverIndex] ?? allPoints[0]
+
+  // Month-boundary indices for x-axis labels on dense historical data
+  const monthBoundaries = []
+  let lastMonthKey = null
+  allPoints.forEach((p, idx) => {
+    if (p.type !== 'historical') return
+    const key = p.label // "Oct '24" — unique per month
+    if (key !== lastMonthKey) {
+      monthBoundaries.push(idx)
+      lastMonthKey = key
+    }
+  })
+
+  // Predicted: every point already monthly, thin if many
+  const predShowEvery = predPoints.length > 18 ? 3 : predPoints.length > 9 ? 2 : 1
 
   return (
     <div className="mt-4 rounded-xl border border-[#1d2b46] bg-[linear-gradient(135deg,#071430,#04101f)] p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-[#dce8ff]">Predicted LTV Gold Trend (Dummy Data)</p>
-        <p className="text-xs text-[#9fb0c7]">
-          Month {hovered.month} - Gold Price SAR {hovered.price.toFixed(2)}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#dce8ff]">Gold Price — Historical &amp; Forecast</p>
+          <div className="mt-1.5 flex items-center gap-5 text-[11px] text-[#9fb0c7]">
+            <span className="flex items-center gap-1.5">
+              <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#7aa3d4" strokeWidth="2.5" /></svg>
+              Historical
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#5ece7d] ring-2 ring-[#5ece7d]/30" />
+              Current
+            </span>
+            <span className="flex items-center gap-1.5">
+              <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#f2cf84" strokeWidth="2.5" strokeDasharray="5,3" /></svg>
+              Forecast
+            </span>
+          </div>
+        </div>
+        <div className="text-right text-xs text-[#9fb0c7]">
+          <p className="font-semibold text-[#dce8ff]">
+            {hovered.type === 'historical' && hovered.date ? hovered.date : hovered.label}
+          </p>
+          <p>SAR {hovered.price.toFixed(2)}/g</p>
+          {hovered.type === 'predicted' && <p className="text-[10px] text-[#f2cf84]">Forecast</p>}
+          {hovered.type === 'current' && <p className="text-[10px] text-[#5ece7d]">Live Price</p>}
+          {hovered.type === 'historical' && <p className="text-[10px] text-[#7aa3d4]">Historical</p>}
+        </div>
       </div>
 
       <div className="mt-3 w-full overflow-x-auto">
         <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[760px]">
+          {/* Y-axis grid + labels */}
           {[0, 1, 2, 3, 4].map((tick) => {
-            const value = maxY - ((maxY - minY) / 4) * tick
-            const yPos = y(value)
+            const val = maxY - ((maxY - minY) / 4) * tick
+            const yp = yPos(val)
             return (
               <g key={tick}>
-                <line x1={pad.left} y1={yPos} x2={width - pad.right} y2={yPos} stroke="#1e3354" />
-                <text x={16} y={yPos + 4} fontSize="10" fill="#8ea5c7">
-                  {value.toFixed(0)}
+                <line x1={pad.left} y1={yp} x2={width - pad.right} y2={yp} stroke="#1e3354" strokeDasharray="4,4" />
+                <text x={pad.left - 8} y={yp + 4} fontSize="10" fill="#8ea5c7" textAnchor="end">
+                  {val.toFixed(0)}
                 </text>
               </g>
             )
           })}
 
-          <polyline points={path} fill="none" stroke="#f2cf84" strokeWidth="3" />
+          {/* Y-axis label */}
+          <text x={-(height / 2)} y={14} transform="rotate(-90)" textAnchor="middle" fontSize="10" fill="#9fb0c7">
+            SAR / gram
+          </text>
 
-          {trendData.map((d, idx) => (
-            <g key={d.month}>
+          {/* Forecast shaded region */}
+          {predPoints.length > 0 && currentIdx >= 0 && (
+            <rect
+              x={xPos(predStartIdx)}
+              y={pad.top}
+              width={xPos(allPoints.length - 1) - xPos(predStartIdx)}
+              height={gH}
+              fill="#f2cf840a"
+            />
+          )}
+
+          {/* Vertical "now" marker */}
+          {currentIdx >= 0 && (
+            <>
+              <line
+                x1={xPos(currentIdx)} y1={pad.top}
+                x2={xPos(currentIdx)} y2={height - pad.bottom}
+                stroke="#5ece7d" strokeWidth="1.5" strokeDasharray="5,4" opacity="0.55"
+              />
+              <text x={xPos(currentIdx)} y={pad.top - 6} textAnchor="middle" fontSize="9" fill="#5ece7d" fontWeight="600">
+                NOW
+              </text>
+            </>
+          )}
+
+          {/* Historical polyline */}
+          {histPoints.length > 0 && (
+            <polyline points={histPath} fill="none" stroke="#7aa3d4" strokeWidth="2.5" strokeLinejoin="round" />
+          )}
+
+          {/* Forecast polyline */}
+          {predPoints.length > 0 && (
+            <polyline points={predPath} fill="none" stroke="#f2cf84" strokeWidth="2.5" strokeDasharray="7,4" strokeLinejoin="round" />
+          )}
+
+          {/* Historical: invisible wide hit-area strips per day for hover */}
+          {histPoints.map((p, idx) => (
+            <rect
+              key={idx}
+              x={xPos(idx) - (gW / (allPoints.length - 1)) / 2}
+              y={pad.top}
+              width={gW / (allPoints.length - 1)}
+              height={gH}
+              fill="transparent"
+              onMouseEnter={() => setHoverIndex(idx)}
+              className="cursor-crosshair"
+            />
+          ))}
+
+          {/* Hover crosshair on historical */}
+          {hoverIndex < histPoints.length && histPoints.length > 0 && (
+            <line
+              x1={xPos(hoverIndex)} y1={pad.top}
+              x2={xPos(hoverIndex)} y2={height - pad.bottom}
+              stroke="#7aa3d4" strokeWidth="1" opacity="0.4"
+            />
+          )}
+
+          {/* Hover dot on historical */}
+          {hoverIndex < histPoints.length && histPoints.length > 0 && (
+            <circle
+              cx={xPos(hoverIndex)} cy={yPos(allPoints[hoverIndex].price)}
+              r={4} fill="#7aa3d4" stroke="#ffffff" strokeWidth="1.5"
+            />
+          )}
+
+          {/* Current + predicted dots (not dense — render all) */}
+          {allPoints.map((p, idx) => {
+            if (p.type === 'historical') return null
+            const isCurrent = p.type === 'current'
+            const isHovered = hoverIndex === idx
+            const r = isCurrent ? 6 : isHovered ? 5 : 3.5
+            const fill = isCurrent ? '#5ece7d' : '#f2cf84'
+            return (
               <circle
-                cx={x(idx)}
-                cy={y(d.price)}
-                r={hoverIndex === idx ? 5 : 4}
-                fill={hoverIndex === idx ? '#ffd479' : '#e8be67'}
+                key={idx}
+                cx={xPos(idx)} cy={yPos(p.price)}
+                r={r}
+                fill={fill}
+                stroke={isCurrent ? '#e0fff0' : isHovered ? '#ffffff' : 'none'}
+                strokeWidth={isCurrent ? 2 : isHovered ? 1 : 0}
                 onMouseEnter={() => setHoverIndex(idx)}
                 className="cursor-pointer"
               />
-              <text x={x(idx)} y={height - 17} textAnchor="middle" fontSize="10" fill="#9fb0c7">
-                {d.month}
+            )
+          })}
+
+          {/* X-axis: month boundaries for historical */}
+          {monthBoundaries.map((idx) => (
+            <g key={idx}>
+              <line
+                x1={xPos(idx)} y1={height - pad.bottom}
+                x2={xPos(idx)} y2={height - pad.bottom + 4}
+                stroke="#3a4f6a" strokeWidth="1"
+              />
+              <text
+                x={xPos(idx)} y={height - 8}
+                textAnchor="middle" fontSize="9" fill="#9fb0c7"
+              >
+                {allPoints[idx].label}
               </text>
             </g>
           ))}
 
-          <text x={width / 2} y={height - 2} textAnchor="middle" fontSize="11" fill="#9fb0c7">
-            Time in Months (1 to 12)
-          </text>
-          <text
-            x={-height / 2}
-            y={10}
-            transform="rotate(-90)"
-            textAnchor="middle"
-            fontSize="11"
-            fill="#9fb0c7"
-          >
-            Gold Price (SAR)
-          </text>
+          {/* X-axis: current label */}
+          {currentIdx >= 0 && (
+            <text
+              x={xPos(currentIdx)} y={height - 8}
+              textAnchor="middle" fontSize="9" fill="#5ece7d" fontWeight="700"
+            >
+              {allPoints[currentIdx].label}
+            </text>
+          )}
+
+          {/* X-axis: predicted labels (monthly, thinned) */}
+          {allPoints.map((p, idx) => {
+            if (p.type !== 'predicted') return null
+            const predIdx = idx - predStartIdx
+            if (predIdx % predShowEvery !== 0) return null
+            return (
+              <text
+                key={idx}
+                x={xPos(idx)} y={height - 8}
+                textAnchor="middle" fontSize="9" fill="#c8a84b"
+              >
+                {p.label}
+              </text>
+            )
+          })}
         </svg>
       </div>
     </div>
