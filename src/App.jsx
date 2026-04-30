@@ -568,17 +568,8 @@ function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
 
   const hovered = allPoints[hoverIndex] ?? allPoints[0]
 
-  // Month-boundary indices for x-axis labels on dense historical data
-  const monthBoundaries = []
-  let lastMonthKey = null
-  allPoints.forEach((p, idx) => {
-    if (p.type !== 'historical') return
-    const key = p.label // "Oct '24" — unique per month
-    if (key !== lastMonthKey) {
-      monthBoundaries.push(idx)
-      lastMonthKey = key
-    }
-  })
+  // Historical points are already monthly — every point gets a label
+  const monthBoundaries = histPoints.map((_, idx) => idx)
 
   // Predicted: every point already monthly, thin if many
   const predShowEvery = predPoints.length > 18 ? 3 : predPoints.length > 9 ? 2 : 1
@@ -665,6 +656,18 @@ function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
             <polyline points={histPath} fill="none" stroke="#7aa3d4" strokeWidth="2.5" strokeLinejoin="round" />
           )}
 
+          {/* Historical dots (one per month) */}
+          {histPoints.map((p, idx) => (
+            <circle
+              key={`hdot-${idx}`}
+              cx={xPos(idx)} cy={yPos(p.price)}
+              r={hoverIndex === idx ? 5 : 3.5}
+              fill="#7aa3d4"
+              stroke={hoverIndex === idx ? '#ffffff' : '#071430'}
+              strokeWidth="1.5"
+            />
+          ))}
+
           {/* Forecast polyline */}
           {predPoints.length > 0 && (
             <polyline points={predPath} fill="none" stroke="#f2cf84" strokeWidth="2.5" strokeDasharray="7,4" strokeLinejoin="round" />
@@ -690,14 +693,6 @@ function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
               x1={xPos(hoverIndex)} y1={pad.top}
               x2={xPos(hoverIndex)} y2={height - pad.bottom}
               stroke="#7aa3d4" strokeWidth="1" opacity="0.4"
-            />
-          )}
-
-          {/* Hover dot on historical */}
-          {hoverIndex < histPoints.length && histPoints.length > 0 && (
-            <circle
-              cx={xPos(hoverIndex)} cy={yPos(allPoints[hoverIndex].price)}
-              r={4} fill="#7aa3d4" stroke="#ffffff" strokeWidth="1.5"
             />
           )}
 

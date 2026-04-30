@@ -209,20 +209,30 @@ def _build_display_history(
     n_months: int = 6,
 ) -> List[GoldPricePoint]:
     """
-    Slices the last `n_months` from the real dataset and returns every daily
-    data point (no down-sampling). Frontend labels by month boundary.
+    Returns one averaged data point per calendar month for the last n_months.
+    Uses the last day of each month as the representative date.
     """
     cutoff_ord = dates[-1] - n_months * 30
     mask       = dates >= cutoff_ord
     h_dates    = dates[mask] if mask.any() else dates
     h_prices   = prices[mask] if mask.any() else prices
 
+    # Group by year-month
+    monthly: dict = {}
+    for ord_day, price in zip(h_dates, h_prices):
+        dt = datetime.fromordinal(int(ord_day))
+        key = (dt.year, dt.month)
+        monthly.setdefault(key, []).append((ord_day, price))
+
     points = []
-    for i in range(len(h_dates)):
-        dt = datetime.fromordinal(int(h_dates[i]))
+    for key in sorted(monthly):
+        bucket = monthly[key]
+        last_ord = max(b[0] for b in bucket)
+        avg_price = sum(b[1] for b in bucket) / len(bucket)
+        dt = datetime.fromordinal(int(last_ord))
         points.append(GoldPricePoint(
             date=dt.strftime("%Y-%m-%d"),
-            price_aed_per_gram=round(float(h_prices[i]), 2),
+            price_aed_per_gram=round(avg_price, 2),
         ))
     return points
 
@@ -313,8 +323,8 @@ async def build_gold_insights(tenure_months: int) -> GoldInsights:
     # Fit models on full 20-year USD/oz dataset
     models = _fit_models(dates, prices)
 
-    # Display history: last 12 months, convert USD/oz → SAR/gram
-    display_history = _build_display_history(dates, prices, n_months=12)
+    # Display history: last 3 months, convert USD/oz → SAR/gram
+    display_history = _build_display_history(dates, prices, n_months=3)
     for p in display_history:
         p.price_aed_per_gram = round((p.price_aed_per_gram / TROY_OZ_TO_GRAM) * SAR_PER_USD, 2)
 
