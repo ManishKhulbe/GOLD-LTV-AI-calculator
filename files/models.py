@@ -74,7 +74,7 @@ class CustomerProfile(BaseModel):
     customer_type: str           # "Existing" | "New"
     risk_category: RiskCategory
     cibil_score: int
-    # UAE PASS live identity fields (populated when UAEPASS_ACCESS_TOKEN is set)
+    # UAE PASS enriched fields (optional – populated when UAE PASS returns data)
     gender: Optional[str] = None
     email: Optional[str] = None
     full_name_ar: Optional[str] = None
@@ -97,9 +97,10 @@ class GoldPricePoint(BaseModel):
 
 
 class GoldInsights(BaseModel):
-    live_price_aed_per_gram: float
-    historical_prices: List[GoldPricePoint]   # last 6 months
-    predicted_prices: List[GoldPricePoint]    # next tenure months
+    live_price_aed_per_gram: float            # AED — used for loan valuation calc
+    live_price_sar_per_gram: float            # SAR — used for chart display
+    historical_prices: List[GoldPricePoint]   # last 12 months, SAR/gram
+    predicted_prices: List[GoldPricePoint]    # next tenure months, SAR/gram
     predicted_change_pct: float               # % change over tenure
     trend: str                                # "RISING" | "FALLING" | "STABLE"
 
@@ -150,16 +151,16 @@ class LoanCalculationResponse(BaseModel):
     # Risk
     risk_insights: RiskInsights
 
-    # Live market snapshot (aligned with /api/gold-rate/live)
-    live_gold_currency: str
-    live_gold_rates: dict[str, float]
+    # Live karat rates (SAR)
+    live_gold_currency: str = "SAR"
+    live_gold_rates: dict = {}        # { "24K": float, "22K": float, ... }
 
 
 # ── Lightweight gold-price response ───────────────────────────────────────────
 
 class LiveGoldPriceResponse(BaseModel):
-    currency: str
+    currency: str = "SAR"
     rate_24k_per_gram: float
-    karats: dict[str, float]
+    karats: dict                  # { "24K": float, "22K": float, ... }
     price_usd_per_oz: float
     updated_at: str
