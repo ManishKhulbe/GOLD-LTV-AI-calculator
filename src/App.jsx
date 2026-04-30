@@ -89,20 +89,15 @@ function App() {
 
   return (
     <main className="min-h-screen p-4 md:p-6">
-      <header className="flex items-center justify-between border-b border-[#e5e7eb] px-6 py-4">
-        <p className="text-sm font-semibold text-[#1f2937]">Finance House Dubai</p>
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="text-[#6b7280] transition hover:text-[#111827]"
-          >
-            <span className="text-[15px]">◦</span>
-          </button>
-          <button type="button" aria-label="Settings" className="text-[#6b7280] transition hover:text-[#111827]">
-            <span className="text-[15px]">⚙</span>
-          </button>
-          <div className="h-8 w-8 rounded-full bg-[linear-gradient(145deg,#0b1220,#f4d9a4)]" />
+      <header className="flex items-center justify-between border-b border-[#e5e7eb] bg-white px-8 py-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[linear-gradient(145deg,#0b1220,#c9a84c)] text-sm font-bold text-white shadow">
+            FH
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[#1f2937] leading-tight">Finance House Dubai</p>
+            <p className="text-[10px] text-[#9ca3af] leading-tight">Gold Loan · AI Valuation Platform</p>
+          </div>
         </div>
       </header>
 
@@ -390,15 +385,6 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
         <div className="rounded-xl border border-[#e1e4ea] bg-white p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-[#4b5563]">Customer Profile</p>
-            {customer.uaepass_verified ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#e6f4ff] px-2 py-0.5 text-[10px] font-semibold text-[#0070d8]">
-                ✓ UAE PASS Verified
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#f3f4f6] px-2 py-0.5 text-[10px] text-[#6b7280]">
-                Local Profile
-              </span>
-            )}
           </div>
           <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2">
             {[
@@ -465,16 +451,19 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                 </p>
               ) : null}
             </div>
-            <div className="rounded-lg border border-[#22314a] bg-[#0a1830] p-3">
-              <p className="text-xs text-[#9db0d1]">User Risk Factor</p>
-              <RiskGauge
-                score={risk.user_risk_score ?? 18}
-                label={risk.user_risk_label ?? 'LOW RISK'}
-                textColorClass={riskBadgeColor}
+            <div className="rounded-lg border border-[#22314a] bg-[#0a1830] p-3 space-y-4">
+              <HorizontalRiskBar
+                title="User Risk"
+                score={risk.user_risk_score}
+                label={risk.user_risk_label}
               />
-              <p className="mt-1 text-xs text-[#9db0d1]">
-                Company Exposure: {risk.company_risk_exposure ?? '—'}
-              </p>
+              <div className="border-t border-[#1b2a43]" />
+              <HorizontalRiskBar
+                title="Company Risk"
+                score={risk.company_risk_score}
+                label={risk.company_risk_label}
+                exposure={risk.company_risk_exposure}
+              />
             </div>
           </div>
           <div className="rounded-lg border border-[#22314a] bg-[#0a1830] p-3">
@@ -791,50 +780,42 @@ function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
   )
 }
 
-function RiskGauge({ score, label, textColorClass }) {
-  const clampedScore = Math.max(0, Math.min(100, Number(score)))
-  const angle = -120 + (clampedScore / 100) * 240
-  const radians = (angle * Math.PI) / 180
-  const needleLength = 44
-  const centerX = 90
-  const centerY = 72
-  const needleX = centerX + needleLength * Math.cos(radians)
-  const needleY = centerY + needleLength * Math.sin(radians)
-  const normalizedLabel = String(label).replace('_', ' ')
+function HorizontalRiskBar({ title, score, label, exposure }) {
+  const clamped = Math.max(0, Math.min(100, Number(score ?? 0)))
+  const fillColor =
+    clamped <= 33 ? '#5ece7d' :
+    clamped <= 66 ? '#f2cf84' : '#f87171'
+  const trackColor =
+    clamped <= 33 ? '#0e3a20' :
+    clamped <= 66 ? '#3a2e0e' : '#3a0e0e'
+  const labelColor =
+    clamped <= 33 ? 'text-[#5ece7d]' :
+    clamped <= 66 ? 'text-[#f2cf84]' : 'text-[#f87171]'
 
   return (
-    <div className="mt-2">
-      <svg viewBox="0 0 180 104" className="h-[84px] w-full">
-        <defs>
-          <linearGradient id="riskArc" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#e56767" />
-            <stop offset="50%" stopColor="#f2cf84" />
-            <stop offset="100%" stopColor="#5ece7d" />
-          </linearGradient>
-        </defs>
-
-        <path
-          d="M 28 72 A 62 62 0 0 1 152 72"
-          fill="none"
-          stroke="url(#riskArc)"
-          strokeWidth="12"
-          strokeLinecap="round"
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs text-[#9db0d1]">{title}</p>
+        <span className={`text-[11px] font-semibold ${labelColor}`}>{label ?? '—'}</span>
+      </div>
+      <div className="relative h-3 w-full overflow-hidden rounded-full" style={{ background: trackColor }}>
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${clamped}%`, background: fillColor, boxShadow: `0 0 8px ${fillColor}55` }}
         />
-        <line
-          x1={centerX}
-          y1={centerY}
-          x2={needleX}
-          y2={needleY}
-          stroke="#f8fafc"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-        <circle cx={centerX} cy={centerY} r="5.2" fill="#f8fafc" />
-      </svg>
-      <p className={`-mt-1 text-center text-sm font-semibold ${textColorClass}`}>{normalizedLabel}</p>
+      </div>
+      <div className="mt-1 flex items-center justify-between">
+        <span className="text-[10px] text-[#4a607a]">Low Risk</span>
+        <span className={`text-[11px] font-bold ${labelColor}`}>{clamped.toFixed(0)}<span className="text-[9px] font-normal text-[#4a607a]">/100</span></span>
+        <span className="text-[10px] text-[#4a607a]">High Risk</span>
+      </div>
+      {exposure != null && (
+        <p className="mt-1 text-[10px] text-[#6b839f]">Exposure: <span className="text-[#9db0d1]">{exposure}</span></p>
+      )}
     </div>
   )
 }
+
 
 function CibilGauge({ score, label }) {
   return (
