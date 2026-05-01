@@ -44,7 +44,6 @@ This replaces a manual, spreadsheet-based loan evaluation process that is slow, 
 ### Out-of-Scope
 - Real database integration (PostgreSQL, etc.)
 - Real UAE PASS OAuth2 flow (stubbed)
-- Authentication / user login system
 - Loan origination or disbursement workflows
 - Document upload / KYC document management
 - Mobile application
@@ -155,7 +154,6 @@ This replaces a manual, spreadsheet-based loan evaluation process that is slow, 
 | [ ] CALCULATIONS.md documentation | 🟢 Low | Done |
 | [ ] UAE PASS production placeholder | 🟢 Low | Done |
 | [ ] Real database integration | 🔴 High | Pending |
-| [ ] Authentication & session management | 🔴 High | Pending |
 | [ ] CI/CD pipeline | 🟡 Medium | Pending |
 | [ ] Load testing | 🟡 Medium | Pending |
 

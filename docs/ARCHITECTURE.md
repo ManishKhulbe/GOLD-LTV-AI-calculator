@@ -281,20 +281,7 @@ flowchart TD
 
 ---
 
-## 9. Authentication & Authorization
-
-**Current state:** None. The system has no authentication layer.
-
-**Production requirements:**
-- Credit officers should authenticate via Finance House SSO (e.g., Azure AD / SAML)
-- UAE PASS OAuth2 client_credentials flow for borrower identity
-  - `UAEPASS_CLIENT_ID` + `UAEPASS_CLIENT_SECRET` via `.env`
-  - Production endpoint: `https://id.uaepass.ae/idshub/`
-  - Staging endpoint: `https://stg-id.uaepass.ae/idshub/`
-
----
-
-## 10. Scalability & Performance Considerations
+## 9. Scalability & Performance Considerations
 
 | Area | Current State | Production Recommendation |
 |---|---|---|
@@ -307,7 +294,7 @@ flowchart TD
 
 ---
 
-## 11. Security Considerations
+## 10. Security Considerations
 
 | Risk | Current Mitigation | Recommended |
 |---|---|---|
@@ -320,7 +307,7 @@ flowchart TD
 
 ---
 
-## 12. Third-Party Integrations
+## 11. Third-Party Integrations
 
 | Service | Endpoint | Auth | Purpose | Fallback |
 |---|---|---|---|---|
@@ -329,7 +316,7 @@ flowchart TD
 
 ---
 
-## 13. Currency Architecture
+## 12. Currency Architecture
 
 All monetary values in the system flow through two conversion paths from the same `XAU/USD` source:
 

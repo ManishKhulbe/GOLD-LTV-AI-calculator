@@ -325,7 +325,6 @@ This document defines the business requirements for an AI-assisted Gold Loan Val
 | Real database | Phase 6 future work |
 | Mobile application | Not required for credit officer workflow |
 | Arabic UI | Future localisation requirement |
-| Authentication / login | Assumed handled by Finance House network/SSO |
 | Automated gold history updates | Manual file update process for now |
 | Multi-branch / multi-user role management | Single-role system for this POC |
 | Loan repayment tracking | Separate loan management system |
