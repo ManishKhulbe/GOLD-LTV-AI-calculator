@@ -1,0 +1,50 @@
+[
+  {
+    "emirates_id": "784-1985-1234567-1",
+    "name": "Ahmed Al-Mansoori",
+    "nationality": "Emirati",
+    "mobile": "+971-50-123-4567",
+    "gender": "Male",
+    "email": "ahmed.mansoori@financehouae.ae",
+    "customer_type": "Premium",
+    "risk_category": "A+",
+    "cibil_score": 780,
+    "active_loans": 0,
+    "total_loans": 4,
+    "missed_emis": 0,
+    "outstanding_balance": 0.0,
+    "job_profession": "Government Employee"
+  },
+  {
+    "emirates_id": "784-1990-2345678-2",
+    "name": "Sara Mohammed Al-Rashidi",
+    "nationality": "Emirati",
+    "mobile": "+971-55-987-6543",
+    "gender": "Female",
+    "email": "sara.rashidi@email.ae",
+    "customer_type": "Standard",
+    "risk_category": "B",
+    "cibil_score": 680,
+    "active_loans": 1,
+    "total_loans": 3,
+    "missed_emis": 1,
+    "outstanding_balance": 15000.0,
+    "job_profession": "Private Employee"
+  },
+  {
+    "emirates_id": "784-1978-3456789-3",
+    "name": "Khalid Ibrahim Al-Zaabi",
+    "nationality": "Emirati",
+    "mobile": "+971-52-456-7890",
+    "gender": "Male",
+    "email": "khalid.zaabi@business.ae",
+    "customer_type": "Standard",
+    "risk_category": "C",
+    "cibil_score": 600,
+    "active_loans": 2,
+    "total_loans": 5,
+    "missed_emis": 3,
+    "outstanding_balance": 42000.0,
+    "job_profession": "Self Employed"
+  }
+]

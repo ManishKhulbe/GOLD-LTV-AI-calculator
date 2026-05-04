@@ -1,0 +1,104 @@
+{
+  "784-1985-1234567-1": [
+    {
+      "loan_id": "LN-2021-001",
+      "amount": 45000.0,
+      "tenure_months": 12,
+      "status": "CLOSED",
+      "missed_emis": 0,
+      "outstanding_balance": 0.0
+    },
+    {
+      "loan_id": "LN-2022-004",
+      "amount": 78000.0,
+      "tenure_months": 18,
+      "status": "CLOSED",
+      "missed_emis": 0,
+      "outstanding_balance": 0.0
+    },
+    {
+      "loan_id": "LN-2023-011",
+      "amount": 120000.0,
+      "tenure_months": 24,
+      "status": "CLOSED",
+      "missed_emis": 0,
+      "outstanding_balance": 0.0
+    },
+    {
+      "loan_id": "LN-2024-019",
+      "amount": 95000.0,
+      "tenure_months": 12,
+      "status": "CLOSED",
+      "missed_emis": 0,
+      "outstanding_balance": 0.0
+    }
+  ],
+  "784-1990-2345678-2": [
+    {
+      "loan_id": "LN-2022-007",
+      "amount": 30000.0,
+      "tenure_months": 12,
+      "status": "CLOSED",
+      "missed_emis": 0,
+      "outstanding_balance": 0.0
+    },
+    {
+      "loan_id": "LN-2023-015",
+      "amount": 55000.0,
+      "tenure_months": 18,
+      "status": "DEFAULTED",
+      "missed_emis": 1,
+      "outstanding_balance": 0.0
+    },
+    {
+      "loan_id": "LN-2024-028",
+      "amount": 45000.0,
+      "tenure_months": 24,
+      "status": "ACTIVE",
+      "missed_emis": 0,
+      "outstanding_balance": 15000.0
+    }
+  ],
+  "784-1978-3456789-3": [
+    {
+      "loan_id": "LN-2020-003",
+      "amount": 25000.0,
+      "tenure_months": 12,
+      "status": "CLOSED",
+      "missed_emis": 1,
+      "outstanding_balance": 0.0
+    },
+    {
+      "loan_id": "LN-2021-009",
+      "amount": 40000.0,
+      "tenure_months": 18,
+      "status": "CLOSED",
+      "missed_emis": 0,
+      "outstanding_balance": 0.0
+    },
+    {
+      "loan_id": "LN-2022-014",
+      "amount": 35000.0,
+      "tenure_months": 12,
+      "status": "DEFAULTED",
+      "missed_emis": 2,
+      "outstanding_balance": 0.0
+    },
+    {
+      "loan_id": "LN-2023-021",
+      "amount": 50000.0,
+      "tenure_months": 24,
+      "status": "ACTIVE",
+      "missed_emis": 0,
+      "outstanding_balance": 22000.0
+    },
+    {
+      "loan_id": "LN-2024-033",
+      "amount": 38000.0,
+      "tenure_months": 18,
+      "status": "ACTIVE",
+      "missed_emis": 0,
+      "outstanding_balance": 20000.0
+    }
+  ]
+}
