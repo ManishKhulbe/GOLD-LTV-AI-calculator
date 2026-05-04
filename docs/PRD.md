@@ -127,10 +127,6 @@ The opportunity is to replace this manual pipeline with a real-time dashboard th
 | F-12 | Amortization schedule | 🟡 Should Have | FR-11 | Borrower transparency |
 | F-13 | UAE PASS identity enrichment | 🟢 Could Have | FR-12 | Nice-to-have verification; currently stubbed |
 | F-14 | Gold API fallback (hardcoded rate) | 🔴 Must Have | NFR-R1 | Reliability; system must work even if API is down |
-| F-15 | Arabic language UI | ⚪ Won't Have | — | Future localisation; out of scope v1 |
-| F-17 | Loan origination workflow | ⚪ Won't Have | — | Separate banking system |
-| F-18 | Mobile application | ⚪ Won't Have | — | Officer workflow is desktop-only |
-| F-19 | Real-time database | ⚪ Won't Have | — | Phase 6 future work |
 
 ---
 

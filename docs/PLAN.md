@@ -54,7 +54,7 @@ This replaces a manual, spreadsheet-based loan evaluation process that is slow, 
 
 ## 4. Milestones & Phases
 
-### Phase 1 — Foundation (Week 1–2)
+### Phase 1 — Foundation
 > Core backend setup, data models, gold price integration
 
 | Task | Priority | Status |
@@ -70,7 +70,7 @@ This replaces a manual, spreadsheet-based loan evaluation process that is slow, 
 
 ---
 
-### Phase 2 — Core Calculation Engine (Week 2–3)
+### Phase 2 — Core Calculation Engine
 > LTV, eligibility, risk scoring
 
 | Task | Priority | Status |
@@ -87,7 +87,7 @@ This replaces a manual, spreadsheet-based loan evaluation process that is slow, 
 
 ---
 
-### Phase 3 — ML Prediction Pipeline (Week 3–4)
+### Phase 3 — ML Prediction Pipeline
 > Gold price forecasting
 
 | Task | Priority | Status |
@@ -105,7 +105,7 @@ This replaces a manual, spreadsheet-based loan evaluation process that is slow, 
 
 ---
 
-### Phase 4 — Frontend Dashboard (Week 4–5)
+### Phase 4 — Frontend Dashboard
 > React UI, calculator form, summary screen
 
 | Task | Priority | Status |
@@ -126,7 +126,7 @@ This replaces a manual, spreadsheet-based loan evaluation process that is slow, 
 
 ---
 
-### Phase 5 — EMI Calculator Feature (Week 5)
+### Phase 5 — EMI Calculator Feature
 > Embedded EMI tool with amortization schedule
 
 | Task | Priority | Status |
@@ -143,7 +143,7 @@ This replaces a manual, spreadsheet-based loan evaluation process that is slow, 
 
 ---
 
-### Phase 6 — Polish & Production Readiness (Week 6)
+### Phase 6 — Polish & Production Readiness 
 > UI refinement, documentation, production integration stubs
 
 | Task | Priority | Status |
