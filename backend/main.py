@@ -21,12 +21,13 @@ from models import (
     LoanCalculationRequest,
     LoanCalculationResponse,
     LiveGoldPriceResponse,
+    TodayGoldLoanScoreResponse,
     CustomerProfile,
     LoanHistoryOverview,
 )
 from services.gold_service import (
     fetch_live_gold_price_aed,
-    fetch_live_gold_price_sar_karats,
+    fetch_live_gold_price_aed_karats,
     build_gold_insights,
 )
 from services.customer_service import get_customer_profile, get_loan_history
@@ -82,9 +83,9 @@ async def live_gold_price():
     Fetches the current XAU price from gold-api.com and converts to AED/gram.
     Falls back to a cached value if the external API is unavailable.
     """
-    karats, rate_24k, usd_per_oz, updated_at = await fetch_live_gold_price_sar_karats()
+    karats, rate_24k, usd_per_oz, updated_at = await fetch_live_gold_price_aed_karats()
     return LiveGoldPriceResponse(
-        currency="SAR",
+        currency="AED",
         rate_24k_per_gram=rate_24k,
         karats=karats,
         price_usd_per_oz=usd_per_oz,
@@ -95,17 +96,91 @@ async def live_gold_price():
 @app.get("/api/gold-rate/live", tags=["Gold"], summary="Live Saudi gold rates by karat")
 async def live_gold_rate_by_karat():
     """
-    Returns live Saudi gold prices in SAR per gram for multiple karats.
+    Returns live UAE gold prices in AED per gram for multiple karats.
     """
-    karats, rate_24k, _, _ = await fetch_live_gold_price_sar_karats()
+    karats, rate_24k, _, _ = await fetch_live_gold_price_aed_karats()
     return {
-        "country": "Saudi Arabia",
-        "currency": "SAR",
+        "country": "UAE",
+        "currency": "AED",
         "unit": "g",
-        "conversion": "XAU/USD per oz -> USD per gram -> SAR per gram",
+        "conversion": "XAU/USD per oz -> USD per gram -> AED per gram",
         "karats": karats,
         "rate24k": karats["24K"] if "24K" in karats else rate_24k,
     }
+
+
+def _build_today_gold_loan_score(predicted_change_pct: float) -> TodayGoldLoanScoreResponse:
+    pct = float(predicted_change_pct)
+
+    if pct >= 5:
+        score = min(10.0, 8.0 + min((pct - 5.0) / 5.0, 1.0) * 2.0)
+        return TodayGoldLoanScoreResponse(
+            score=round(score, 1),
+            label="EXCELLENT TIME",
+            market_condition="Predicted rise >= 5%",
+            guidance="Urgency — act now",
+            tone="Urgent and confident",
+            predicted_change_pct=round(pct, 2),
+        )
+
+    if pct >= 2:
+        score = 6.0 + ((pct - 2.0) / 3.0) * 1.9
+        return TodayGoldLoanScoreResponse(
+            score=round(score, 1),
+            label="GOOD TIME",
+            market_condition="Predicted rise 2–5%",
+            guidance="Positive, encouraging",
+            tone="Positive and supportive",
+            predicted_change_pct=round(pct, 2),
+        )
+
+    if pct >= -2:
+        score = 4.0 + ((pct + 2.0) / 4.0) * 1.9
+        return TodayGoldLoanScoreResponse(
+            score=round(score, 1),
+            label="STABLE MARKET",
+            market_condition="Predicted change ±2%",
+            guidance="Neutral, honest",
+            tone="Neutral",
+            predicted_change_pct=round(pct, 2),
+        )
+
+    if pct >= -8:
+        score = 2.0 + ((pct + 8.0) / 6.0) * 1.9
+        return TodayGoldLoanScoreResponse(
+            score=round(score, 1),
+            label="WAIT IF YOU CAN",
+            market_condition="Predicted drop 2–8%",
+            guidance="Cautious but supportive",
+            tone="Cautious",
+            predicted_change_pct=round(pct, 2),
+        )
+
+    score = max(1.0, 1.9 - min((abs(pct) - 8.0) / 4.0, 0.9))
+    return TodayGoldLoanScoreResponse(
+        score=round(score, 1),
+        label="POOR TIME",
+        market_condition="Predicted drop > 8%",
+        guidance="Honest + safety reassurance",
+        tone="Conservative",
+        predicted_change_pct=round(pct, 2),
+    )
+
+
+@app.get(
+    "/api/gold-loan-score/today",
+    response_model=TodayGoldLoanScoreResponse,
+    tags=["Gold"],
+    summary="ML-based timing score for gold loan action today",
+)
+async def today_gold_loan_score():
+    """
+    Converts ML predicted gold-price change into a 1–10 business score with
+    guidance text for frontline officers.
+    """
+    insights = await build_gold_insights(12)
+    print(insights.predicted_change_pct, 'predicted_change_pct')
+    return _build_today_gold_loan_score(insights.predicted_change_pct)
 
 
 # ── Customer lookup ────────────────────────────────────────────────────────────
@@ -205,8 +280,8 @@ async def calculate_loan(req: LoanCalculationRequest):
             "uaepass_verified": True,
         })
 
-    # ── 2. Live SAR karat rates (same source used by /api/gold-rate/live) ─────
-    live_karats, _, _, _ = await fetch_live_gold_price_sar_karats()
+    # ── 2. Live AED karat rates (same source used by /api/gold-rate/live) ─────
+    live_karats, _, _, _ = await fetch_live_gold_price_aed_karats()
 
     # ── 3. Gold insights (live AED price + history + prediction) ───────────────
     gold_insights = await build_gold_insights(req.tenure_months.value)
@@ -214,6 +289,7 @@ async def calculate_loan(req: LoanCalculationRequest):
     # ── 4 & 5. LTV + eligibility calculation ─────────────────────────────────
     calc = calculate_ltv_and_loan(
         carat=req.carat,
+        gold_type=req.gold_type,
         gold_weight_grams=req.gold_weight_grams,
         tenure_months=req.tenure_months.value,
         job_profession=req.job_profession,
@@ -228,7 +304,7 @@ async def calculate_loan(req: LoanCalculationRequest):
         history=history,
         gold_insights=gold_insights,
         job_profession=req.job_profession.value,
-        eligible_loan_aed=calc["eligible_loan_amount_sar"],
+        eligible_loan_aed=calc["eligible_loan_amount_aed"],
         ltv_pct=calc["recommended_ltv_pct"],
         tenure_months=req.tenure_months.value,
     )
@@ -240,7 +316,7 @@ async def calculate_loan(req: LoanCalculationRequest):
         loan_history=history,
         gold_insights=gold_insights,
         risk_insights=risk,
-        live_gold_currency="SAR",
+        live_gold_currency="AED",
         live_gold_rates=live_karats,
     )
 

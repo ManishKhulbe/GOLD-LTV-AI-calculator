@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import GoldLoanWorkspace from './components/GoldLoanWorkspace'
 
 const initialForm = {
   carat: '',
+  goldType: '',
   emiratesId: '',
   goldWeight: '',
   loanTenure: '',
@@ -10,14 +12,19 @@ const initialForm = {
 
 const BACKEND_BASE_URL = 'http://127.0.0.1:8001'
 
-const formatSar = (value) =>
-  value != null ? `SAR ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+const formatAed = (value) =>
+  value != null ? `AED ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+
+const HEADER_TABS = ['Wealth Management', 'Gold Loans', 'Treasury', 'Institutional']
 
 function App() {
   const [form, setForm] = useState(initialForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [liveGoldRates, setLiveGoldRates] = useState({})
+  const [liveGoldCurrency, setLiveGoldCurrency] = useState('AED')
+  const [liveGoldUnit, setLiveGoldUnit] = useState('g')
+  const [todayLoanScore, setTodayLoanScore] = useState(null)
   const [isRateLoading, setIsRateLoading] = useState(true)
   const [activeScreen, setActiveScreen] = useState('calculator')
   const [valuationResult, setValuationResult] = useState(null)
@@ -38,6 +45,7 @@ function App() {
       body: JSON.stringify({
         emirates_id: formData.emiratesId,
         carat: formData.carat,
+        gold_type: formData.goldType,
         gold_weight_grams: parseFloat(formData.goldWeight),
         tenure_months: parseInt(formData.loanTenure, 10),
         job_profession: formData.jobProfession,
@@ -73,10 +81,21 @@ function App() {
     const fetchLiveGoldRate = async () => {
       setIsRateLoading(true)
       try {
-        const response = await fetch(`${BACKEND_BASE_URL}/api/gold-rate/live`)
-        if (!response.ok) throw new Error('Failed to fetch live gold rate.')
-        const data = await response.json()
-        setLiveGoldRates(data.karats ?? {})
+        const [liveRateResponse, scoreResponse] = await Promise.all([
+          fetch(`${BACKEND_BASE_URL}/api/gold-rate/live`),
+          fetch(`${BACKEND_BASE_URL}/api/gold-loan-score/today`),
+        ])
+        if (!liveRateResponse.ok) throw new Error('Failed to fetch live gold rate.')
+        if (!scoreResponse.ok) throw new Error('Failed to fetch today loan score.')
+
+        const [rateData, scoreData] = await Promise.all([
+          liveRateResponse.json(),
+          scoreResponse.json(),
+        ])
+        setLiveGoldRates(rateData.karats ?? {})
+        setLiveGoldCurrency(rateData.currency ?? 'AED')
+        setLiveGoldUnit(rateData.unit ?? 'g')
+        setTodayLoanScore(scoreData)
       } catch (error) {
         setStatusMessage(error.message)
       } finally {
@@ -88,15 +107,48 @@ function App() {
   }, [])
 
   return (
-    <main className="min-h-screen p-4 md:p-6">
-      <header className="flex items-center justify-between border-b border-[#e5e7eb] bg-white px-8 py-5 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[linear-gradient(145deg,#0b1220,#c9a84c)] text-sm font-bold text-white shadow">
-            FH
+    <main className="min-h-screen bg-[#f3f4f6] p-4 md:p-6">
+      <header className="rounded-2xl border border-[#d9dce1] bg-white px-6 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-[#f9fafb] text-xs font-bold text-[#111827]">
+              FH
+            </div>
+            <p className="text-[30px] font-semibold tracking-[-0.02em] text-[#111827]">Finance House</p>
           </div>
-          <div>
-            <p className="text-sm font-bold text-[#1f2937] leading-tight">Finance House Dubai</p>
-            <p className="text-[10px] text-[#9ca3af] leading-tight">Gold Loan · AI Valuation Platform</p>
+          <nav className="flex items-end gap-10">
+            {HEADER_TABS.map((tab) => {
+              const isActive = tab === 'Gold Loans'
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`relative pb-2 text-sm font-medium transition-colors ${isActive ? 'text-[#8d7440]' : 'text-[#707580] hover:text-[#1f2937]'}`}
+                >
+                  {tab}
+                  {isActive ? (
+                    <span className="absolute inset-x-0 -bottom-[1px] mx-auto h-[2px] w-full rounded-full bg-[#c8aa6f]" />
+                  ) : null}
+                </button>
+              )
+            })}
+          </nav>
+          <div className="flex items-center gap-3 text-[#4b5563]">
+            <button type="button" className="rounded-full p-2 transition hover:bg-[#f3f4f6]" aria-label="Notifications">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 17h5l-1.4-1.4a2 2 0 0 1-.6-1.4V11a6 6 0 0 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                <path d="M10 20a2 2 0 0 0 4 0" />
+              </svg>
+            </button>
+            <button type="button" className="rounded-full p-2 transition hover:bg-[#f3f4f6]" aria-label="Settings">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3.2" />
+                <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1.8 1.8 0 1 1-2.5 2.5l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a1.8 1.8 0 1 1-3.6 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1.8 1.8 0 0 1-2.5-2.5l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a1.8 1.8 0 1 1 0-3.6h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1.8 1.8 0 0 1 2.5-2.5l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a1.8 1.8 0 1 1 3.6 0v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2a1.8 1.8 0 1 1 0 3.6h-.2a1 1 0 0 0-.9.6Z" />
+              </svg>
+            </button>
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#d1d5db] bg-gradient-to-br from-[#eff6ff] to-[#dbeafe] text-[11px] font-semibold text-[#1e3a8a]">
+              Exe
+            </div>
           </div>
         </div>
       </header>
@@ -111,6 +163,9 @@ function App() {
           statusMessage={statusMessage}
           isRateLoading={isRateLoading}
           liveGoldRates={liveGoldRates}
+          liveGoldCurrency={liveGoldCurrency}
+          liveGoldUnit={liveGoldUnit}
+          todayLoanScore={todayLoanScore}
         />
       ) : (
         <SummaryScreen setActiveScreen={setActiveScreen} valuationResult={valuationResult} />
@@ -128,122 +183,24 @@ function CalculatorScreen({
   statusMessage,
   isRateLoading,
   liveGoldRates,
+  liveGoldCurrency,
+  liveGoldUnit,
+  todayLoanScore,
 }) {
   return (
-    <section className="px-6 pb-12 pt-8">
-      <h1 className="text-[46px] font-semibold tracking-tight text-[#0f172a]">Gold Loan Valuation</h1>
-      <p className="mt-2 text-[18px] text-[#6b7280]">Enter asset and client details to initiate valuation.</p>
-
-      <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_340px]">
-        <form className="rounded-xl border border-[#e5e7eb] bg-white p-6" onSubmit={handleCalculate}>
-          <h2 className="text-[36px] font-medium text-[#1f2937]">Valuation Details</h2>
-          <div className="mt-4 border-t border-[#e5e7eb]" />
-
-          <div className="mt-5 grid gap-5 md:grid-cols-2">
-            <Field label="Carat">
-              <SelectField value={form.carat} onChange={handleChange('carat')}>
-                <option value="">Select Carat</option>
-                <option value="14K">14K</option>
-                <option value="18K">18K</option>
-                <option value="21K">21K</option>
-                <option value="22K">22K</option>
-                <option value="24K">24K</option>
-              </SelectField>
-            </Field>
-
-            <Field label="Emirates ID">
-              <InputField
-                value={form.emiratesId}
-                onChange={handleChange('emiratesId')}
-                placeholder="784-XXXX-XXXXXXX-X"
-              />
-            </Field>
-
-            <Field label="Gold Weight">
-              <InputField
-                value={form.goldWeight}
-                onChange={handleChange('goldWeight')}
-                placeholder="0.00"
-                suffix="grams"
-                type="number"
-              />
-            </Field>
-
-            <Field label="Loan Tenure">
-              <SelectField value={form.loanTenure} onChange={handleChange('loanTenure')}>
-                <option value="">Select Tenure</option>
-                <option value="6">6 Months</option>
-                <option value="12">12 Months</option>
-                <option value="18">18 Months</option>
-                <option value="24">24 Months</option>
-                <option value="36">36 Months</option>
-              </SelectField>
-            </Field>
-
-            <Field label="Job Profession">
-              <SelectField value={form.jobProfession} onChange={handleChange('jobProfession')}>
-                <option value="">Select Profession</option>
-                <option value="Government Employee">Government Employee</option>
-                <option value="Private Employee">Private Employee</option>
-                <option value="Business Owner">Business Owner</option>
-                <option value="Self Employed">Self Employed</option>
-                <option value="Retired">Retired</option>
-                <option value="Freelancer">Freelancer</option>
-              </SelectField>
-            </Field>
-          </div>
-
-          <div className="mt-8 flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-md bg-[#0c2d5b] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0a264d]"
-            >
-              {isSubmitting ? 'Calculating...' : 'Calculate Gold Loan Value'}
-            </button>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="rounded-md border border-[#d1d5db] bg-white px-5 py-2.5 text-sm font-semibold text-[#374151] transition hover:bg-[#f9fafb]"
-            >
-              Reset
-            </button>
-          </div>
-          {statusMessage ? (
-            <p className="mt-4 text-sm text-[#4b5563]" aria-live="polite">
-              {statusMessage}
-            </p>
-          ) : null}
-        </form>
-
-        <aside className="h-fit rounded-xl border border-[#e5e7eb] bg-white p-5">
-          <div className="border-t border-[#e5e7eb]" />
-
-          <div className="mt-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9ca3af]">Live Gold Rate</p>
-            <p className="mt-1 text-[26px] font-semibold text-[#111827]">
-              {isRateLoading || !liveGoldRates['24K']
-                ? 'SAR ---.-- /g'
-                : `SAR ${Number(liveGoldRates['24K']).toFixed(2)} /g`}
-            </p>
-            <div className="mt-3 space-y-1.5">
-              {['24K', '22K', '21K', '18K', '14K'].map((karat) => (
-                <p key={karat} className="flex items-center justify-between text-sm text-[#4b5563]">
-                  <span>{karat}</span>
-                  <span className="font-medium text-[#111827]">
-                    {isRateLoading || !liveGoldRates[karat]
-                      ? '--.--'
-                      : Number(liveGoldRates[karat]).toFixed(2)}{' '}
-                    SAR/g
-                  </span>
-                </p>
-              ))}
-            </div>
-          </div>
-
-        </aside>
-      </div>
-    </section>
+    <GoldLoanWorkspace
+      form={form}
+      handleChange={handleChange}
+      handleCalculate={handleCalculate}
+      handleReset={handleReset}
+      isSubmitting={isSubmitting}
+      statusMessage={statusMessage}
+      isRateLoading={isRateLoading}
+      liveGoldRates={liveGoldRates}
+      liveGoldCurrency={liveGoldCurrency}
+      liveGoldUnit={liveGoldUnit}
+      todayLoanScore={todayLoanScore}
+    />
   )
 }
 
@@ -259,7 +216,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
   const [emiMonths, setEmiMonths] = useState(String(r.suggested_tenure_months ?? 12))
   const [emiRate, setEmiRate] = useState('')
 
-  const principal = r.eligible_loan_amount_sar ?? 0
+  const principal = r.eligible_loan_amount_aed ?? 0
   const parsedRate = parseFloat(emiRate)
   const parsedMonths = parseInt(emiMonths, 10)
 
@@ -293,7 +250,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
   const riskBadgeColor =
     riskLabel === 'LOW' ? 'text-[#9bd6ac]' : riskLabel === 'MEDIUM' ? 'text-[#f6dd92]' : 'text-[#f6a692]'
   const summaryKaratRates = r.live_gold_rates ?? {}
-  const summaryCurrency = r.live_gold_currency ?? 'SAR'
+  const summaryCurrency = r.live_gold_currency ?? 'AED'
 
   return (
     <section className="px-6 pb-10 pt-6">
@@ -331,13 +288,13 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <MetricChip label="Gold Valuation" value={formatSar(r.gold_valuation_sar)} />
-            <MetricChip label="Eligible Loan Amount" value={formatSar(r.eligible_loan_amount_sar)} />
+            <MetricChip label="Gold Valuation" value={formatAed(r.gold_valuation_aed)} />
+            <MetricChip label="Eligible Loan Amount" value={formatAed(r.eligible_loan_amount_aed)} />
           </div>
-          {r.future_eligible_loan_amount_sar != null && r.eligible_loan_amount_sar != null && (() => {
-            const delta = r.future_eligible_loan_amount_sar - r.eligible_loan_amount_sar
-            const deltaPct = r.eligible_loan_amount_sar !== 0
-              ? ((delta / r.eligible_loan_amount_sar) * 100).toFixed(1)
+          {r.future_eligible_loan_amount_aed != null && r.eligible_loan_amount_aed != null && (() => {
+            const delta = r.future_eligible_loan_amount_aed - r.eligible_loan_amount_aed
+            const deltaPct = r.eligible_loan_amount_aed !== 0
+              ? ((delta / r.eligible_loan_amount_aed) * 100).toFixed(1)
               : '0.0'
             const rising = delta >= 0
             return (
@@ -345,7 +302,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-xs text-[#c8a84b]">Future-Adjusted Loan Estimate</p>
-                    <p className="mt-1 text-lg font-semibold text-[#f2cf84]">{formatSar(r.future_eligible_loan_amount_sar)}</p>
+                    <p className="mt-1 text-lg font-semibold text-[#f2cf84]">{formatAed(r.future_eligible_loan_amount_aed)}</p>
                     <p className="mt-0.5 text-[10px] text-[#6b839f]">
                       Based on predicted gold price at {r.suggested_tenure_months}-month tenure end
                     </p>
@@ -368,7 +325,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
           <div className="space-y-2 text-sm text-[#4b5563]">
             <p className="flex justify-between">
               <span>Recommended Amount</span>
-              <span className="font-semibold">{formatSar(r.eligible_loan_amount_sar)}</span>
+              <span className="font-semibold">{formatAed(r.eligible_loan_amount_aed)}</span>
             </p>
             <p className="flex justify-between">
               <span>Suggested Tenure</span>
@@ -403,7 +360,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                   onChange={(e) => setEmiMonths(e.target.value)}
                   className="w-full rounded-md border border-[#d3d8e0] px-2 py-1.5 text-xs text-[#374151] focus:border-[#071c44] focus:outline-none"
                 >
-                  {[3, 6, 12, 18, 24, 36].map((m) => (
+                  {[3, 6, 12, 18, 24, 36, 48].map((m) => (
                     <option key={m} value={m}>{m} Months</option>
                   ))}
                 </select>
@@ -428,7 +385,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                   <p className="text-[10px] text-[#6b7280]">
                     {emiMode === 'monthly' ? `Monthly EMI · ${emiMonths} payments` : `Bullet Payment · due at ${emiMonths}-month end`}
                   </p>
-                  <p className="text-sm font-bold text-[#071c44]">{formatSar(emiResult)}</p>
+                  <p className="text-sm font-bold text-[#071c44]">{formatAed(emiResult)}</p>
                 </div>
               ) : (
                 <p className="text-center text-[10px] text-[#9aa1af]">Enter rate to calculate</p>
@@ -462,7 +419,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-1 text-[9px] text-[#9aa1af]">Principal (green) ↑ each month · Interest (red) ↓ each month · All values in SAR</p>
+                <p className="mt-1 text-[9px] text-[#9aa1af]">Principal (green) ↑ each month · Interest (red) ↓ each month · All values in AED</p>
               </div>
             )}
           </div>
@@ -509,7 +466,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
             ['Active Loans', history.active_loans ?? '—'],
             ['Closed Loans', history.closed_loans ?? '—'],
             ['Missed EMIs', history.missed_emis ?? '—'],
-            ['Outstanding Balance', formatSar(history.outstanding_balance)],
+            ['Outstanding Balance', formatAed(history.outstanding_balance)],
           ]}
         />
       </div>
@@ -581,7 +538,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                         <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusColor}`}>
                           {row.status}
                         </span>
-                        <p className="text-[10px] font-medium text-[#c8d8ef]">{formatSar(row.amount)}</p>
+                        <p className="text-[10px] font-medium text-[#c8d8ef]">{formatAed(row.amount)}</p>
                       </div>
                     </div>
                   )
@@ -607,7 +564,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
 function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
   const historicalRaw = goldInsights.historical_prices ?? []
   const predictedRaw = goldInsights.predicted_prices ?? []
-  const livePrice = goldInsights.live_price_sar_per_gram ?? null
+  const livePrice = goldInsights.live_price_aed_per_gram ?? null
 
   const fmtLabel = (dateStr) => {
     const d = new Date(dateStr + 'T00:00:00')
@@ -709,7 +666,7 @@ function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
           <p className="font-semibold text-[#dce8ff]">
             {hovered.type === 'historical' && hovered.date ? hovered.date : hovered.label}
           </p>
-          <p>SAR {hovered.price.toFixed(2)}/g</p>
+          <p>AED {hovered.price.toFixed(2)}/g</p>
           {hovered.type === 'predicted' && <p className="text-[10px] text-[#f2cf84]">Forecast</p>}
           {hovered.type === 'current' && <p className="text-[10px] text-[#5ece7d]">Live Price</p>}
           {hovered.type === 'historical' && <p className="text-[10px] text-[#7aa3d4]">Historical</p>}
@@ -734,7 +691,7 @@ function PredictedLtvGoldTrendChart({ goldInsights = {} }) {
 
           {/* Y-axis label */}
           <text x={-(height / 2)} y={14} transform="rotate(-90)" textAnchor="middle" fontSize="10" fill="#9fb0c7">
-            SAR / gram
+            AED / gram
           </text>
 
           {/* Forecast shaded region */}
@@ -960,42 +917,6 @@ function MetricChip({ label, value }) {
       <p className="text-xs text-[#9eb2cd]">{label}</p>
       <p className="mt-1 text-lg font-semibold text-[#ecf2ff]">{value}</p>
     </div>
-  )
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-semibold text-[#6b7280]">{label}</span>
-      {children}
-    </label>
-  )
-}
-
-function InputField({ value, onChange, placeholder, suffix, type = 'text' }) {
-  return (
-    <div className="flex h-12 items-center justify-between rounded-md border border-[#d1d5db] bg-white px-3">
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="h-full w-full border-none bg-transparent text-sm text-[#374151] outline-none placeholder:text-[#9ca3af]"
-      />
-      {suffix ? <span className="text-sm text-[#9ca3af]">{suffix}</span> : null}
-    </div>
-  )
-}
-
-function SelectField({ value, onChange, children }) {
-  return (
-    <select
-      value={value}
-      onChange={onChange}
-      className="h-12 w-full rounded-md border border-[#d1d5db] bg-white px-3 text-sm text-[#6b7280] outline-none"
-    >
-      {children}
-    </select>
   )
 }
 

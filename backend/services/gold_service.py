@@ -263,9 +263,6 @@ async def fetch_live_gold_price_aed() -> Tuple[float, float, str]:
     return round(aed_per_gram, 2), round(usd_per_oz, 2), updated_at
 
 
-# ── SAR conversion ────────────────────────────────────────────────────────────
-SAR_PER_USD = 3.7500   # Saudi Riyal fixed peg
-
 KARAT_PURITY = {
     "24K": 1.0000,
     "22K": 0.9167,
@@ -275,13 +272,13 @@ KARAT_PURITY = {
 }
 
 
-async def fetch_live_gold_price_sar_karats() -> Tuple[dict, float, float, str]:
+async def fetch_live_gold_price_aed_karats() -> Tuple[dict, float, float, str]:
     """
-    Fetches XAU/USD from gold-api.com and returns SAR per gram for every karat.
+    Fetches XAU/USD from gold-api.com and returns AED per gram for every karat.
 
     Returns:
-        karats       – dict  { "24K": float, "22K": float, ... }  SAR/gram
-        rate_24k     – float  SAR per gram for pure 24K gold
+        karats       – dict  { "24K": float, "22K": float, ... }  AED/gram
+        rate_24k     – float  AED per gram for pure 24K gold
         usd_per_oz   – float  raw XAU/USD price from the API
         updated_at   – str    human-readable timestamp
     """
@@ -298,14 +295,14 @@ async def fetch_live_gold_price_sar_karats() -> Tuple[dict, float, float, str]:
         usd_per_oz = FALLBACK_USD_OZ
         updated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC (fallback)")
 
-    sar_per_gram_24k = (usd_per_oz / TROY_OZ_TO_GRAM) * SAR_PER_USD
+    aed_per_gram_24k = (usd_per_oz / TROY_OZ_TO_GRAM) * AED_PER_USD
 
     karats = {
-        karat: round(sar_per_gram_24k * purity, 4)
+        karat: round(aed_per_gram_24k * purity, 4)
         for karat, purity in KARAT_PURITY.items()
     }
 
-    return karats, round(sar_per_gram_24k, 4), round(usd_per_oz, 2), updated_at
+    return karats, round(aed_per_gram_24k, 4), round(usd_per_oz, 2), updated_at
 
 
 # ── 6. Public facade ───────────────────────────────────────────────────────────
@@ -313,11 +310,11 @@ async def fetch_live_gold_price_sar_karats() -> Tuple[dict, float, float, str]:
 async def build_gold_insights(tenure_months: int) -> GoldInsights:
     """
     Full pipeline → returns a GoldInsights object with everything the
-    dashboard needs. All price values are in SAR per gram.
+    dashboard needs. All price values are in AED per gram.
     """
-    # Live price — SAR for both calc and display
+    # Live price — AED for both calc and display
     _, live_usd_per_oz, _ = await fetch_live_gold_price_aed()
-    live_sar_per_gram = round((live_usd_per_oz / TROY_OZ_TO_GRAM) * SAR_PER_USD, 4)
+    live_aed_per_gram = round((live_usd_per_oz / TROY_OZ_TO_GRAM) * AED_PER_USD, 4)
 
     # Load real history (values are USD/oz from source JSON)
     dates, prices = _load_history()
@@ -325,30 +322,30 @@ async def build_gold_insights(tenure_months: int) -> GoldInsights:
     # Fit models on full 20-year USD/oz dataset
     models = _fit_models(dates, prices)
 
-    # Display history: last 3 months, convert USD/oz → SAR/gram
+    # Display history: last 3 months, convert USD/oz → AED/gram
     display_history = _build_display_history(dates, prices, n_months=3)
     for p in display_history:
-        p.price_aed_per_gram = round((p.price_aed_per_gram / TROY_OZ_TO_GRAM) * SAR_PER_USD, 2)
+        p.price_aed_per_gram = round((p.price_aed_per_gram / TROY_OZ_TO_GRAM) * AED_PER_USD, 2)
 
     # Predict in USD/oz space (models trained on USD/oz), anchor with live USD/oz
     predicted, pct_change, trend = _predict(models, tenure_months, live_usd_per_oz)
 
-    # Capture tenure-end price in SAR before converting predicted list
+    # Capture tenure-end price in AED before converting predicted list
     if predicted:
         end_usd_oz = predicted[-1].price_aed_per_gram   # still USD/oz at this point
-        predicted_end_price_sar = round((end_usd_oz / TROY_OZ_TO_GRAM) * SAR_PER_USD, 2)
+        predicted_end_price_aed = round((end_usd_oz / TROY_OZ_TO_GRAM) * AED_PER_USD, 2)
     else:
-        predicted_end_price_sar = live_sar_per_gram
+        predicted_end_price_aed = live_aed_per_gram
 
-    # Convert predicted prices from USD/oz → SAR/gram for chart display
+    # Convert predicted prices from USD/oz → AED/gram for chart display
     for p in predicted:
-        p.price_aed_per_gram = round((p.price_aed_per_gram / TROY_OZ_TO_GRAM) * SAR_PER_USD, 2)
+        p.price_aed_per_gram = round((p.price_aed_per_gram / TROY_OZ_TO_GRAM) * AED_PER_USD, 2)
 
     return GoldInsights(
-        live_price_sar_per_gram=live_sar_per_gram,
+        live_price_aed_per_gram=live_aed_per_gram,
         historical_prices=display_history,
         predicted_prices=predicted,
         predicted_change_pct=pct_change,
         trend=trend,
-        predicted_end_price_sar_per_gram=predicted_end_price_sar,
+        predicted_end_price_aed_per_gram=predicted_end_price_aed,
     )
