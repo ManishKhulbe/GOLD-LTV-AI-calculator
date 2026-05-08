@@ -24,6 +24,7 @@ CARAT_PURITY: dict[str, float] = {
 
 # ── Base LTV ceiling (regulatory + internal policy) ───────────────────────────
 BASE_LTV = 0.75   # 75 %
+BASE_BULLET_LTV = 0.55  # 55 %
 
 # ── Carat multipliers (relative to 24K) ───────────────────────────────────────
 CARAT_MULTIPLIERS: dict[str, float] = {
@@ -47,6 +48,22 @@ def _tenure_factor(tenure_months: int) -> float:
     if tenure_months >= 36:
         return 0.95
     return 1.00
+
+
+def _future_uplift_guardrail(predicted_change_pct: float) -> float:
+    """
+    Guardrail for future-adjusted loan amounts.
+    Caps upside so future estimates stay in a controlled +3% to +4% band
+    over current eligible amount.
+    """
+    pct = float(predicted_change_pct)
+    if pct <= 4:
+        return 0.03
+    if pct <= 10:
+        return 0.0325
+    if pct <= 20:
+        return 0.035
+    return 0.04
 
 # ── CIBIL factor ──────────────────────────────────────────────────────────────
 def _cibil_factor(score: int) -> float:
@@ -115,15 +132,15 @@ def calculate_ltv_and_loan(
     pure_grams          = gold_weight_grams * purity
     live_price          = gold_insights.live_price_aed_per_gram
     gold_valuation      = round(pure_grams * live_price, 2)
-    future_price        = gold_insights.predicted_end_price_aed_per_gram
-    future_gold_valuation = round(pure_grams * future_price, 2)
+    future_price = gold_insights.predicted_end_price_aed_per_gram
+    raw_future_gold_valuation = round(pure_grams * future_price, 2)
 
     # ── Individual factors ────────────────────────────────────────────────────
     carat_mult  = CARAT_MULTIPLIERS[carat.value]
     gold_type_mult = GOLD_TYPE_MULTIPLIERS[gold_type.value]
     tenure_mult = _tenure_factor(tenure_months)
 
-    # ── Compute effective LTV (carat + gold type + tenure factors) ───────────
+    # ── Compute effective LTVs (regular + bullet) ─────────────────────────────
     final_ltv = (
         BASE_LTV
         * carat_mult
@@ -131,9 +148,28 @@ def calculate_ltv_and_loan(
         * tenure_mult
     )
     final_ltv = round(min(final_ltv, BASE_LTV), 4)  # never exceed base ceiling
+    bullet_final_ltv = (
+        BASE_BULLET_LTV
+        * carat_mult
+        * gold_type_mult
+        * tenure_mult
+    )
+    bullet_final_ltv = round(min(bullet_final_ltv, BASE_BULLET_LTV), 4)
 
-    eligible_amount        = round(gold_valuation * final_ltv, 2)
-    future_eligible_amount = round(future_gold_valuation * final_ltv * 0.97, 2)  # 3% safety buffer
+    eligible_amount = round(gold_valuation * final_ltv, 2)
+    bullet_eligible_amount = round(gold_valuation * bullet_final_ltv, 2)
+
+    # Future-adjusted estimates: apply 3–4% guardrail over current eligible amount.
+    uplift = _future_uplift_guardrail(gold_insights.predicted_change_pct)
+    raw_future_eligible_amount = round(raw_future_gold_valuation * final_ltv * 0.97, 2)
+    raw_bullet_future_eligible_amount = round(raw_future_gold_valuation * bullet_final_ltv * 0.97, 2)
+    guarded_future_eligible_amount = round(eligible_amount * (1.0 + uplift), 2)
+    guarded_bullet_future_eligible_amount = round(bullet_eligible_amount * (1.0 + uplift), 2)
+    future_eligible_amount = min(raw_future_eligible_amount, guarded_future_eligible_amount)
+    bullet_future_eligible_amount = min(raw_bullet_future_eligible_amount, guarded_bullet_future_eligible_amount)
+
+    # Keep displayed future valuation aligned with guarded future eligibility logic.
+    future_gold_valuation = round(gold_valuation * (1.0 + uplift) / 0.97, 2)
 
     # ── LTV breakdown (deltas from base) ──────────────────────────────────────
     breakdown = LTVBreakdown(
@@ -160,10 +196,13 @@ def calculate_ltv_and_loan(
     return dict(
         system_decision=decision,
         recommended_ltv_pct=round(final_ltv * 100, 2),
+        bullet_recommended_ltv_pct=round(bullet_final_ltv * 100, 2),
         gold_valuation_aed=gold_valuation,
         eligible_loan_amount_aed=eligible_amount,
+        bullet_eligible_loan_amount_aed=bullet_eligible_amount,
         future_gold_valuation_aed=future_gold_valuation,
         future_eligible_loan_amount_aed=future_eligible_amount,
+        bullet_future_eligible_loan_amount_aed=bullet_future_eligible_amount,
         suggested_tenure_months=tenure_months,
         cibil_score=customer.cibil_score,
         cibil_label=cibil_label,

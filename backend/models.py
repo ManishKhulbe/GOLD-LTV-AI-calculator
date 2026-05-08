@@ -139,10 +139,13 @@ class LoanCalculationResponse(BaseModel):
     # Hero section
     system_decision: str              # "Pre-Approved" | "Manual Review" | "Rejected"
     recommended_ltv_pct: float
+    bullet_recommended_ltv_pct: float
     gold_valuation_aed: float
     eligible_loan_amount_aed: float
+    bullet_eligible_loan_amount_aed: float
     future_gold_valuation_aed: float
     future_eligible_loan_amount_aed: float
+    bullet_future_eligible_loan_amount_aed: float
     suggested_tenure_months: int
     cibil_score: int
     cibil_label: str

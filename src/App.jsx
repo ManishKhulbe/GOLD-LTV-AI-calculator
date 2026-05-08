@@ -213,12 +213,20 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
   const loanItems = history.loan_items ?? []
 
   const [emiMode, setEmiMode] = useState('monthly')
+  const [emiBaseMode, setEmiBaseMode] = useState('current')
   const [emiMonths, setEmiMonths] = useState(String(r.suggested_tenure_months ?? 12))
   const [emiRate, setEmiRate] = useState('')
 
-  const principal = r.eligible_loan_amount_aed ?? 0
+  const currentPrincipal = r.eligible_loan_amount_aed ?? 0
+  const futurePrincipal = r.future_eligible_loan_amount_aed ?? 0
+  const bulletCurrentPrincipal = r.bullet_eligible_loan_amount_aed ?? 0
+  const bulletFuturePrincipal = r.bullet_future_eligible_loan_amount_aed ?? 0
+  const principal = emiMode === 'upfront'
+    ? (emiBaseMode === 'future' ? bulletFuturePrincipal : bulletCurrentPrincipal)
+    : (emiBaseMode === 'future' ? futurePrincipal : currentPrincipal)
   const parsedRate = parseFloat(emiRate)
   const parsedMonths = parseInt(emiMonths, 10)
+  const ratePresets = emiMode === 'upfront' ? [16] : [8, 9, 10]
 
   const emiResult = (() => {
     if (!principal || !parsedRate || parsedRate <= 0 || !parsedMonths) return null
@@ -227,6 +235,7 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
       if (monthlyRate === 0) return principal / parsedMonths
       return principal * monthlyRate * Math.pow(1 + monthlyRate, parsedMonths) / (Math.pow(1 + monthlyRate, parsedMonths) - 1)
     } else {
+      // Bullet payment uses simple interest over tenure: A = P + (P * r * m/12)
       return principal * (1 + (parsedRate / 100) * (parsedMonths / 12))
     }
   })()
@@ -291,6 +300,10 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
             <MetricChip label="Gold Valuation" value={formatAed(r.gold_valuation_aed)} />
             <MetricChip label="Eligible Loan Amount" value={formatAed(r.eligible_loan_amount_aed)} />
           </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <MetricChip label="Bullet Eligible Amount" value={formatAed(r.bullet_eligible_loan_amount_aed)} />
+            <MetricChip label="Bullet Future Estimate" value={formatAed(r.bullet_future_eligible_loan_amount_aed)} />
+          </div>
           {r.future_eligible_loan_amount_aed != null && r.eligible_loan_amount_aed != null && (() => {
             const delta = r.future_eligible_loan_amount_aed - r.eligible_loan_amount_aed
             const deltaPct = r.eligible_loan_amount_aed !== 0
@@ -336,6 +349,28 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
           </div>
           <div className="mt-4 border-t border-[#e5e7eb] pt-3">
             <p className="mb-2 text-xs font-semibold text-[#4b5563]">EMI Calculator</p>
+            <div className="mb-2 flex rounded-lg border border-[#e5e7eb] overflow-hidden text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setEmiBaseMode('current')}
+                className={`flex-1 py-1.5 transition-colors ${emiBaseMode === 'current' ? 'bg-[#071c44] text-white' : 'bg-white text-[#6b7280] hover:bg-[#f9fafb]'}`}
+              >
+                Current Eligible
+              </button>
+              <button
+                type="button"
+                onClick={() => setEmiBaseMode('future')}
+                disabled={!futurePrincipal}
+                className={`flex-1 py-1.5 transition-colors ${emiBaseMode === 'future' ? 'bg-[#071c44] text-white' : 'bg-white text-[#6b7280] hover:bg-[#f9fafb]'} disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                Future-Adjusted (AI)
+              </button>
+            </div>
+            {emiMode === 'upfront' ? (
+              <p className="mb-2 text-[10px] text-[#6b7280]">
+                Bullet mode uses Bullet Eligible (Current) or Bullet Future Estimate (AI).
+              </p>
+            ) : null}
             <div className="flex rounded-lg border border-[#e5e7eb] overflow-hidden text-xs font-medium">
               <button
                 type="button"
@@ -346,7 +381,10 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
               </button>
               <button
                 type="button"
-                onClick={() => setEmiMode('upfront')}
+                onClick={() => {
+                  setEmiMode('upfront')
+                  setEmiRate('16')
+                }}
                 className={`flex-1 py-1.5 transition-colors ${emiMode === 'upfront' ? 'bg-[#071c44] text-white' : 'bg-white text-[#6b7280] hover:bg-[#f9fafb]'}`}
               >
                 Bullet Payment
@@ -377,12 +415,28 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
                   onChange={(e) => setEmiRate(e.target.value)}
                   className="w-full rounded-md border border-[#d3d8e0] px-2 py-1.5 text-xs text-[#374151] focus:border-[#071c44] focus:outline-none"
                 />
+                <select
+                  value={emiRate}
+                  onChange={(e) => setEmiRate(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-[#d3d8e0] px-2 py-1.5 text-xs text-[#374151] focus:border-[#071c44] focus:outline-none"
+                >
+                  <option value="">Select preset rate</option>
+                  {ratePresets.map((rate) => (
+                    <option key={rate} value={rate}>
+                      {rate}%
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className={`mt-2 rounded-lg p-2.5 ${emiResult != null ? 'bg-[#f0f4ff] border border-[#c7d4f5]' : 'bg-[#f9fafb] border border-[#e5e7eb]'}`}>
               {emiResult != null ? (
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] text-[#6b7280]">
+                    {(emiMode === 'upfront'
+                      ? 'AI Bullet Future Base'
+                      : (emiBaseMode === 'future' ? 'AI Future Base' : 'Current Base'))}
+                    {' · '}
                     {emiMode === 'monthly' ? `Monthly EMI · ${emiMonths} payments` : `Bullet Payment · due at ${emiMonths}-month end`}
                   </p>
                   <p className="text-sm font-bold text-[#071c44]">{formatAed(emiResult)}</p>
