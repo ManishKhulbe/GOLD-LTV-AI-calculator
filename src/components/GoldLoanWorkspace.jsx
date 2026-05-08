@@ -144,9 +144,9 @@ export default function GoldLoanWorkspace({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="h-10 w-full rounded-md bg-[#020b2a] px-4 text-sm font-semibold text-white transition-all duration-200 hover:bg-[#091a4a] hover:scale-[1.03] hover:shadow-lg active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70"
+                className="h-10 w-full rounded-md bg-[#020b2a] px-4 text-sm font-semibold text-white transition hover:bg-[#091a4a] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {isSubmitting ? 'Estimating...' : 'Estimate Gold Price'}
+                {isSubmitting ? 'Estimating...' : 'Estimate Loan'}
               </button>
               <button
                 type="button"
