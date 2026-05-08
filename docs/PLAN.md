@@ -1,245 +1,239 @@
 # PLAN.md — Spec-Driven Development Plan
-
-**Project:** Gold Loan Valuation & Eligibility Dashboard  
-**Client:** Finance House Dubai  
-**Version:** 1.0  
-**Date:** 2026-05-08
+# Gold Loan Valuation & Eligibility Dashboard — Finance House Dubai
 
 ---
 
 ## 1. Project Overview & Purpose
 
-The Gold Loan Valuation & Eligibility Dashboard is an internal tool for Finance House Dubai's credit officers and loan advisors. It automates the assessment of gold-backed loan applications — calculating real-time gold valuations, determining the Loan-to-Value (LTV) ratio with multi-factor adjustments, scoring borrower risk, predicting future gold price trajectories using an ML pipeline, and issuing an instant eligibility decision (Pre-Approved / Manual Review / Rejected).
-
-The system replaces manual spreadsheet-based appraisals with a structured, auditable, and real-time digital workflow.
+The Gold Loan Valuation & Eligibility Dashboard is an internal-facing decision-support tool for Finance House Dubai's loan officers and credit analysts. It automates the end-to-end gold loan eligibility workflow: live gold pricing, ML-powered price forecasting, LTV computation, borrower risk scoring, and a one-click eligibility decision — replacing manual spreadsheet calculations and reducing human error.
 
 ---
 
-## 2. Goals and Success Criteria
+## 2. Goals & Success Criteria
 
 | Goal | Success Criterion |
 |------|-------------------|
-| Accurate real-time gold valuation | Live XAU/USD rate fetched on every request; fallback triggers gracefully |
-| Correct LTV calculation | All 6 multiplier factors applied per formula in CALCULATIONS.md |
-| ML gold price prediction | Blended polynomial + linear model; predictions anchored to live price |
-| Borrower risk scoring | User and company risk 0–100 computed from CIBIL, EMI history, profession, gold trend |
-| Eligibility decision | System decision (Pre-Approved / Manual Review) with auditable remarks |
-| UAE PASS identity enrichment | Customer data enrichable via UAE PASS (stub → real integration path documented) |
-| API-first backend | All logic exposed via documented FastAPI endpoints with Swagger UI |
-| Responsive frontend | Dashboard renders on desktop; calculator and summary screens functional |
+| Automate gold valuation | System calculates valuation within 2s of form submission |
+| ML-backed price forecasting | Blended polynomial + linear model provides tenure-end AED/gram prediction with ≤5% deviation from actuals in backtesting |
+| Real-time gold rates | Live XAU/USD price displayed on page load; fallback triggers gracefully when API is down |
+| Eligibility decision | System issues Pre-Approved / Manual Review output with reasoning remarks |
+| Risk scoring | Dual risk score (user + company) computed and surfaced with label on every application |
+| UAE PASS identity | Customer identity enriched from UAE PASS on known Emirates IDs |
+| Responsive UI | Dashboard renders correctly on desktop (1280px+) and tablet (768px) |
 
 ---
 
 ## 3. Scope
 
 ### In-Scope
-- Gold loan eligibility calculation (LTV, valuation, eligible amount)
-- Multi-factor LTV adjustment engine (carat, gold type, tenure, CIBIL, profession, trend)
-- ML gold price prediction (polynomial + linear blend, 6–48 months)
-- User and company risk scoring
-- Live gold price feed (gold-api.com → AED/gram conversion)
-- Customer profile and loan history lookup (from seeded JSON data)
-- UAE PASS identity stub (3 hardcoded IDs; production path documented)
-- Frontend calculator form + summary dashboard
-- FastAPI backend with Swagger documentation
-- Today's Gold Loan Score (1–10 market timing signal for officers)
+
+- Gold loan valuation calculator (carat, weight, gold type inputs)
+- Live gold price feed (XAU/USD → AED/gram per karat)
+- ML price prediction pipeline (20-year historical data, blended polynomial + linear)
+- LTV computation with all regulatory multipliers (carat, CIBIL, EMI history, active loans, profession, gold trend)
+- Borrower eligibility decision engine (Pre-Approved / Manual Review)
+- User risk score (0–100) and company risk score (0–100)
+- Customer profile + loan history lookup by Emirates ID
+- UAE PASS identity enrichment (stub; production hook in place)
+- Today's Gold Loan Score (1–10 market timing indicator)
+- Reverse calculator (how much gold needed for a desired loan amount)
+- Summary/results dashboard screen
+- Swagger API documentation
 
 ### Out-of-Scope
-- Real database (PostgreSQL / MongoDB) — current data layer uses JSON files
-- Production UAE PASS OAuth integration
-- Loan origination / application submission workflow
-- Document upload (KYC, income proof)
-- Payment / EMI scheduling
-- Notifications (SMS, email, push)
-- Multi-tenancy or multi-branch support
-- Role-based access control / authentication
-- Mobile application (iOS / Android)
-- Audit logging to persistent store
+
+- Loan disbursement or payment processing
+- Real-time database (all data is JSON-file seeded; no write operations)
+- Multi-user authentication / role-based access control
+- Mobile-native app
+- Production UAE PASS OAuth2 integration (credentials not provisioned)
+- Multi-currency loan disbursement (SAR/AED display only)
+- Automated loan approval workflows or CRM integration
+- Audit logging / compliance reporting
 
 ---
 
 ## 4. Milestones & Phases
 
-```
-Phase 1 ─ Foundation          Week 1–2
-Phase 2 ─ Core Engine         Week 2–4
-Phase 3 ─ ML & Gold Feed      Week 3–5
-Phase 4 ─ Risk & Decision     Week 4–6
-Phase 5 ─ Frontend Dashboard  Week 5–8
-Phase 6 ─ Integration & QA    Week 8–10
-Phase 7 ─ Hardening & Docs    Week 10–12
-```
-
----
-
-## 5. Task Breakdown per Phase
-
-### Phase 1 — Foundation
+### Phase 1 — Foundation & API Layer
+**Timeline: Weeks 1–2**
 
 | Task | Priority | Status |
 |------|----------|--------|
-| [ ] Set up FastAPI project structure (`backend/`, `services/`, `data/`) | 🔴 High | Done |
-| [ ] Define Pydantic models (`models.py`) — enums, request/response | 🔴 High | Done |
-| [ ] Configure CORS middleware | 🔴 High | Done |
-| [ ] Set up Vite + React + Tailwind CSS v4 frontend | 🔴 High | Done |
-| [ ] Implement `/health` endpoint | 🟡 Medium | Done |
-| [ ] Write `seed_data.py` to generate dummy customer and loan JSON | 🔴 High | Done |
+| FastAPI project scaffold with CORS | High | Done |
+| Pydantic request/response models | High | Done |
+| Seed data script (`seed_data.py`) | High | Done |
+| `GET /health` endpoint | Medium | Done |
+| `GET /customer/{emirates_id}` endpoint | High | Done |
+| `GET /customer/{emirates_id}/loans` endpoint | High | Done |
+| Swagger UI documentation | Medium | Done |
 
-**Definition of Done:** Backend starts on port 8001, returns 200 on `/health`. Frontend dev server starts on port 5173.
-
----
-
-### Phase 2 — Core LTV Engine
-
-| Task | Priority | Status |
-|------|----------|--------|
-| [ ] Implement `loan_calculator.py` — gold valuation formula | 🔴 High | Done |
-| [ ] Implement carat purity map + carat multiplier | 🔴 High | Done |
-| [ ] Implement gold type multiplier (Coin / Jewellery / Stone) | 🔴 High | Done |
-| [ ] Implement tenure factor | 🔴 High | Done |
-| [ ] Implement CIBIL factor + missed EMI penalty | 🔴 High | Done |
-| [ ] Implement active loan factor | 🔴 High | Done |
-| [ ] Implement profession factor | 🔴 High | Done |
-| [ ] Implement gold trend factor | 🔴 High | Done |
-| [ ] Implement `_make_decision()` scoring logic | 🔴 High | Done |
-| [ ] Implement `LTVBreakdown` delta calculations | 🟡 Medium | Done |
-| [ ] Wire `/loan/calculate` POST endpoint | 🔴 High | Done |
-
-**Definition of Done:** `POST /loan/calculate` with a seeded Emirates ID returns a complete `LoanCalculationResponse` with correct `final_ltv_pct` within 1% of manual calculation.
+**Definition of Done:** All endpoints return valid JSON; Swagger UI accessible at `/docs`; seed data generates 3 customer records.
 
 ---
 
-### Phase 3 — ML Gold Price Prediction & Live Feed
+### Phase 2 — Gold Price Engine
+**Timeline: Weeks 2–3**
 
 | Task | Priority | Status |
 |------|----------|--------|
-| [ ] Source and validate `gold_history.json` (20-year AED/oz data) | 🔴 High | Done |
-| [ ] Implement `_load_history()` — parse and sort JSON | 🔴 High | Done |
-| [ ] Implement Model A: Polynomial degree-3 Ridge regression | 🔴 High | Done |
-| [ ] Implement Model B: Linear regression on last 365 days | 🔴 High | Done |
-| [ ] Implement 65/35 blend + live-price anchor | 🔴 High | Done |
-| [ ] Add compounding noise model | 🟡 Medium | Done |
-| [ ] Implement `fetch_live_gold_price_aed_karats()` with fallback | 🔴 High | Done |
-| [ ] Implement `/gold/price` and `/api/gold-rate/live` endpoints | 🔴 High | Done |
-| [ ] Implement `/api/gold-loan-score/today` (1–10 timing score) | 🟡 Medium | Done |
-| [ ] Build display history (last 3 months, averaged by month) | 🟡 Medium | Done |
+| Live XAU/USD fetch from `gold-api.com` | High | Done |
+| AED/gram conversion per karat | High | Done |
+| Fallback price when API is unreachable | High | Done |
+| 20-year `gold_history.json` data file | High | Done |
+| `GET /gold/price` endpoint | High | Done |
+| `GET /api/gold-rate/live` endpoint | High | Done |
+| `GET /gold/insights` endpoint | Medium | Done |
 
-**Definition of Done:** `/gold/price` returns AED/gram within 0.01% of manual conversion from XAU/USD spot. Prediction chart shows smooth curve anchored to live price.
+**Definition of Done:** Live rates display for all 5 karats; fallback activates without error on API timeout; gold insights return historical + predicted price arrays.
 
 ---
 
-### Phase 4 — Risk Analysis
+### Phase 3 — ML Prediction Pipeline
+**Timeline: Weeks 3–4**
 
 | Task | Priority | Status |
 |------|----------|--------|
-| [ ] Implement `_user_risk()` — CIBIL + EMI + active loans + profession + balance | 🔴 High | Done |
-| [ ] Implement `_company_risk()` — user contrib + LTV risk + market risk | 🔴 High | Done |
-| [ ] Implement risk labels (LOW / MEDIUM / HIGH / VERY HIGH) | 🟡 Medium | Done |
-| [ ] Wire `build_risk_insights()` into `/loan/calculate` pipeline | 🔴 High | Done |
-| [ ] Implement UAE PASS stub (`uaepass_service.py`) | 🟡 Medium | Done |
-| [ ] Document real UAE PASS integration path | 🟢 Low | Done |
+| Load & clean 20-year historical data | High | Done |
+| Polynomial degree-3 Ridge regression (long-run) | High | Done |
+| Linear regression on last 365 days (momentum) | High | Done |
+| Blended forecast (65% long / 35% recent) | High | Done |
+| Live-price anchor (no seam gap in chart) | Medium | Done |
+| Compounding noise model for realistic chart | Low | Done |
+| Trend classification (RISING / STABLE / FALLING) | High | Done |
+| Today's Gold Loan Score endpoint | Medium | Done |
 
-**Definition of Done:** Risk scores fall within expected bands for all 3 seeded Emirates IDs. Company risk is lower than user risk when gold trend is RISING.
+**Definition of Done:** `build_gold_insights(tenure_months)` returns valid `GoldInsights` object; predicted prices in AED/gram; trend classification correct against 3 test cases.
 
 ---
 
-### Phase 5 — Frontend Dashboard
+### Phase 4 — LTV & Eligibility Engine
+**Timeline: Weeks 4–5**
 
 | Task | Priority | Status |
 |------|----------|--------|
-| [ ] Build `GoldLoanWorkspace` calculator form (carat, Emirates ID, weight, tenure, profession, gold type) | 🔴 High | Done |
-| [ ] Integrate live gold rate display (karat table with AED/gram) | 🔴 High | Done |
-| [ ] Build today's loan score panel (1–10, label, guidance) | 🟡 Medium | Done |
-| [ ] Build reverse calculator (desired loan → gold weight needed) | 🟡 Medium | Done |
-| [ ] Build SummaryScreen — hero section (decision, LTV, eligible amount) | 🔴 High | Done |
-| [ ] Build CIBIL gauge (SVG arc) | 🟡 Medium | Done |
-| [ ] Build risk gauge (SVG arc) | 🟡 Medium | Done |
-| [ ] Build LTV breakdown table | 🔴 High | Done |
-| [ ] Build gold price chart (historical + predicted polyline) | 🟡 Medium | Done |
-| [ ] Build customer profile section | 🔴 High | Done |
-| [ ] Build loan history section | 🔴 High | Done |
-| [ ] Wire form submission → `POST /loan/calculate` | 🔴 High | Done |
-| [ ] Handle loading, error, empty states | 🟡 Medium | Done |
+| Base LTV = 75% with hard cap | High | Done |
+| Carat multiplier (24K–14K) | High | Done |
+| Gold type multiplier (Coin/Jewellery/Stone) | High | Done |
+| Tenure adjustment factor | High | Done |
+| CIBIL factor (6 tiers) | High | Done |
+| Missed EMI penalty | High | Done |
+| Active loan factor | High | Done |
+| Profession factor (6 professions) | High | Done |
+| Gold trend factor | High | Done |
+| LTV breakdown delta calculation | Medium | Done |
+| System decision scoring engine | High | Done |
+| Future loan estimate (3% safety buffer) | Medium | Done |
 
-**Definition of Done:** Calculator form submits, summary screen renders all sections without console errors. Gauges animate. Chart plots historical and predicted lines.
+**Definition of Done:** `calculate_ltv_and_loan()` returns all fields in `LoanCalculationResponse`; LTV never exceeds 75%; decision matches test matrix in CALCULATIONS.md.
 
 ---
 
-### Phase 6 — Integration & QA
+### Phase 5 — Risk Scoring
+**Timeline: Week 5**
 
 | Task | Priority | Status |
 |------|----------|--------|
-| [ ] End-to-end test with all 3 seeded Emirates IDs | 🔴 High | Pending |
-| [ ] Validate LTV calculations match CALCULATIONS.md formulas | 🔴 High | Pending |
-| [ ] Test gold API fallback (simulate network failure) | 🟡 Medium | Pending |
-| [ ] Test UAE PASS enrichment for 3 known Emirates IDs | 🟡 Medium | Pending |
-| [ ] Cross-browser test (Chrome, Safari, Firefox) | 🟡 Medium | Pending |
-| [ ] Verify all API error shapes are consistent | 🟡 Medium | Pending |
-| [ ] CORS validation (frontend → backend on correct ports) | 🔴 High | Pending |
+| User risk score (CIBIL + EMI + active loans + profession + balance) | High | Done |
+| Company risk score (user contrib + LTV risk + market risk) | High | Done |
+| Risk label thresholds (LOW / MEDIUM / HIGH / VERY HIGH) | High | Done |
+| Decoupled company risk (gold trend can offset risky borrower) | Medium | Done |
 
-**Definition of Done:** All 3 seeded IDs return correct, consistent responses. No uncaught exceptions in backend or console errors in frontend.
+**Definition of Done:** `build_risk_insights()` returns `RiskInsights`; company risk can be LOW even when user risk is HIGH (gold rising strongly); score capped at 100.
+
+---
+
+### Phase 6 — Frontend Dashboard
+**Timeline: Weeks 5–7**
+
+| Task | Priority | Status |
+|------|----------|--------|
+| React + Vite + Tailwind CSS v4 setup | High | Done |
+| Calculator screen (form inputs) | High | Done |
+| Live gold rate ticker on load | High | Done |
+| Today's Loan Score badge | Medium | Done |
+| Reverse calculator panel | Medium | Done |
+| `POST /loan/calculate` integration | High | Done |
+| Summary/results screen toggle | High | Done |
+| SVG Risk Gauge components | Medium | Done |
+| SVG CIBIL Gauge component | Medium | Done |
+| LTV breakdown display | Medium | Done |
+| Gold trend chart (historical + predicted) | Medium | Done |
+| Loan history table | Low | Done |
+
+**Definition of Done:** Calculator submits and navigates to summary screen; all dashboard sections render with real API data; no console errors on golden path.
 
 ---
 
 ### Phase 7 — Hardening & Documentation
+**Timeline: Week 7–8**
 
 | Task | Priority | Status |
 |------|----------|--------|
-| [ ] Tighten CORS origins for production | 🔴 High | Pending |
-| [ ] Add input validation error handling (422 shapes) | 🟡 Medium | Pending |
-| [ ] Write CALCULATIONS.md (formula reference) | 🔴 High | Done |
-| [ ] Write CLAUDE.md (codebase guide) | 🟡 Medium | Done |
-| [ ] Write docs/BRD.md, PRD.md, FRD.md, SPEC.md | 🟢 Low | Pending |
-| [ ] Document ENV vars in ENV.md | 🟡 Medium | Pending |
-| [ ] Document UAE PASS production setup steps | 🟡 Medium | Pending |
+| CALCULATIONS.md reference doc | High | Done |
+| CLAUDE.md project context file | Medium | Done |
+| API README | Medium | Done |
+| PLAN.md (this file) | Medium | In Progress |
+| ARCHITECTURE.md | Medium | In Progress |
+| BRD.md | Medium | In Progress |
+| CORS tightened for production | High | Pending |
+| UAE PASS real credentials integration | High | Pending |
+| Real customer database (replace JSON stubs) | High | Pending |
+| Unit tests for LTV calculation | Medium | Pending |
+| Unit tests for risk scoring | Medium | Pending |
+| CI pipeline | Low | Pending |
 
-**Definition of Done:** All documentation complete. Production checklist reviewed.
+**Definition of Done:** All pending items above completed; CORS restricted to known origin; at least 80% coverage on business logic services.
 
 ---
 
-## 6. Risks and Mitigation Strategies
+## 5. Risks & Mitigation Strategies
 
 | Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| `gold-api.com` downtime | Medium | High | Hardcoded fallback `FALLBACK_USD_OZ = 3300.0`; displayed to user as "(fallback)" |
-| `gold_history.json` missing | Low | High | `FileNotFoundError` raised at startup with clear message |
-| Emirates ID not seeded | Medium | Medium | 404 returned with actionable error message |
-| CIBIL/UAE PASS data mismatch | Low | Medium | UAE PASS enrichment is best-effort; original customer data used on failure |
-| ML model drift (outdated history) | Low | Medium | History file is static; document refresh procedure |
-| Port conflict (8001 hardcoded) | Medium | High | Documented in CLAUDE.md; CORS also hardcoded to `*` during dev |
-| Frontend build/bundle issues | Low | Low | Vite build is standard; ESLint configured |
+|------|-----------|--------|-----------|
+| `gold-api.com` API downtime | Medium | High | Fallback to `FALLBACK_USD_OZ = 3300.0`; display "fallback" label in UI |
+| ML model drift (gold price regime change) | Medium | Medium | Blend model design limits short-term noise; 365-day momentum window absorbs regime shifts gradually |
+| UAE PASS credentials not provisioned | High (current) | Low | Stub returns full profiles for 3 seeded IDs; production hook is in place and documented |
+| JSON seed data is read-only (no new customers) | High | Medium | Replace with SQLite or PostgreSQL; `customer_service.py` interface unchanged |
+| LTV regulatory cap change (currently 75%) | Low | High | `BASE_LTV` is a single constant in `loan_calculator.py` — one-line change |
+| Frontend `App.jsx` is monolithic | Medium | Low | Refactor into component files; does not affect API layer |
+| Port 8001 hardcoded in frontend | Low | Medium | Move `BACKEND_BASE_URL` to Vite env variable (`VITE_API_BASE`) |
 
 ---
 
-## 7. Dependencies
+## 6. Dependencies
 
-### Internal
-| Dependency | Used By |
-|------------|---------|
-| `data/gold_history.json` | `gold_service.py` — required at startup |
-| `data/dummy_customers.json` | `customer_service.py` — required for Emirates ID lookup |
-| `data/dummy_loans.json` | `customer_service.py` — required for loan history |
-| `backend/.venv` | All backend services |
+### Internal Dependencies
 
-### External
+| Dependency | Consumer | Notes |
+|------------|----------|-------|
+| `data/gold_history.json` | `gold_service.py` | Required at startup; raises `FileNotFoundError` if missing |
+| `data/dummy_customers.json` | `customer_service.py` | Generated by `seed_data.py` |
+| `data/dummy_loans.json` | `customer_service.py` | Generated by `seed_data.py` |
+| `GoldInsights` object | `loan_calculator.py`, `risk_analyzer.py` | Built by `gold_service.py`; passed to both calculators |
+| `CustomerProfile` + `LoanHistoryOverview` | `loan_calculator.py`, `risk_analyzer.py` | Fetched by `customer_service.py` |
+
+### External Dependencies
+
 | Dependency | Purpose | Fallback |
 |------------|---------|---------|
-| `api.gold-api.com/price/XAU` | Live gold spot price | `FALLBACK_USD_OZ = 3300.0` |
-| UAE PASS OAuth API | Identity enrichment | Stub hardcoded for 3 Emirates IDs |
-| `scikit-learn` | ML regression pipeline | NumPy polyfit fallback |
-| `numpy` | Numerical computation | Required; no fallback |
-| `httpx` | Async HTTP client | Required |
+| `api.gold-api.com/price/XAU` | Live XAU/USD spot price | `FALLBACK_USD_OZ = 3300.0` |
+| UAE PASS API (`id.uaepass.ae`) | Identity verification | Stub profiles for 3 seeded IDs |
+| PyPI: `scikit-learn` | Ridge regression + PolynomialFeatures | NumPy `polyfit` fallback in `gold_service.py` |
+| PyPI: `fastapi`, `uvicorn`, `httpx`, `pydantic` | Core API framework | No fallback; must be installed |
+| npm: `react`, `vite`, `tailwindcss` | Frontend framework | No fallback; must be installed |
 
 ---
 
-## 8. Definition of Done (Per Phase Summary)
+## 7. Definition of Done (Overall)
 
-| Phase | Done When |
-|-------|-----------|
-| Phase 1 — Foundation | Both servers start without errors |
-| Phase 2 — LTV Engine | `/loan/calculate` returns correct LTV breakdown |
-| Phase 3 — ML & Gold | Live price and predictions render in Swagger and frontend |
-| Phase 4 — Risk | Risk scores and labels correct for all seeded profiles |
-| Phase 5 — Frontend | All screens render; form → summary flow works end-to-end |
-| Phase 6 — QA | All seeded IDs pass; no regressions |
-| Phase 7 — Hardening | Docs complete; production checklist clear |
+The project is considered production-ready when:
+
+1. All Phase 1–6 tasks are complete and passing.
+2. CORS is restricted to the known frontend origin.
+3. UAE PASS real credentials are configured and integration is verified.
+4. Customer data is stored in a real database (not JSON stubs).
+5. `BACKEND_BASE_URL` is driven by an environment variable.
+6. Unit tests cover `loan_calculator.py` and `risk_analyzer.py` at ≥80%.
+7. All three documentation files (PLAN, ARCHITECTURE, BRD) are complete and accurate.
+8. Swagger UI accurately reflects all endpoint contracts.

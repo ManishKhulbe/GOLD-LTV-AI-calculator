@@ -1,106 +1,119 @@
 # ARCHITECTURE.md — System Architecture Document
-
-**Project:** Gold Loan Valuation & Eligibility Dashboard  
-**Client:** Finance House Dubai  
-**Version:** 1.0  
-**Date:** 2026-05-08
+# Gold Loan Valuation & Eligibility Dashboard — Finance House Dubai
 
 ---
 
 ## 1. High-Level Architecture Overview
 
-The system follows a classic **two-tier client-server architecture** with a React SPA frontend and a FastAPI backend. There is no separate database server — data is persisted in JSON flat files (seeded dummy data) and fetched live from an external gold price API.
+The system is a two-tier client-server application: a **React SPA** (Single-Page Application) served by Vite, communicating over HTTP with a **FastAPI Python backend**. There is no session layer, no message broker, and no shared cache — every request is stateless. The backend aggregates data from three sources (live external API, static JSON files, ML models) and returns a single richly structured JSON payload per loan calculation request.
 
-```mermaid
-graph TD
-    subgraph Browser["Browser (Port 5173)"]
-        FE["React 19 SPA\n(Vite + Tailwind CSS v4)"]
-    end
-
-    subgraph Backend["FastAPI Server (Port 8001)"]
-        API["FastAPI App\nmain.py"]
-        CS["customer_service.py"]
-        LC["loan_calculator.py"]
-        GS["gold_service.py"]
-        RA["risk_analyzer.py"]
-        UP["uaepass_service.py"]
-    end
-
-    subgraph Data["Data Layer"]
-        DC["dummy_customers.json"]
-        DL["dummy_loans.json"]
-        GH["gold_history.json\n(20yr historical)"]
-    end
-
-    subgraph External["External APIs"]
-        GA["gold-api.com\nXAU/USD spot"]
-        UAEP["UAE PASS OAuth\n(stubbed)"]
-    end
-
-    FE -->|"POST /loan/calculate\nGET /api/gold-rate/live\nGET /api/gold-loan-score/today"| API
-    API --> CS --> DC
-    API --> CS --> DL
-    API --> LC
-    API --> GS --> GH
-    API --> GS -->|"GET /price/XAU"| GA
-    API --> RA
-    API --> UP -->|"stubbed"| UAEP
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        Browser (Client)                          │
+│  React 19 SPA  ←→  Tailwind CSS v4  ←→  Vite 8 Dev / Build      │
+│                                                                  │
+│   CalculatorScreen ──(form submit)──► SummaryScreen             │
+│   GoldLoanWorkspace (layout + reverse calculator)               │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │  HTTP / JSON  (port 8001)
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    FastAPI Backend (Python)                       │
+│                                                                  │
+│  main.py (routes) ──► services/                                  │
+│    ├── gold_service.py      (live price + ML pipeline)           │
+│    ├── customer_service.py  (JSON file lookup)                   │
+│    ├── loan_calculator.py   (LTV + eligibility)                  │
+│    ├── risk_analyzer.py     (user + company risk)                │
+│    └── uaepass_service.py   (identity enrichment stub)           │
+│                                                                  │
+│  models.py (Pydantic schemas)                                    │
+└──────┬──────────────────────────┬────────────────────────────────┘
+       │                          │
+       ▼                          ▼
+┌─────────────┐        ┌──────────────────────────┐
+│ gold-api.com│        │  data/ (local JSON files) │
+│ XAU/USD live│        │  gold_history.json        │
+│  price feed │        │  dummy_customers.json     │
+└─────────────┘        │  dummy_loans.json         │
+                       └──────────────────────────┘
 ```
 
 ---
 
-## 2. Tech Stack
+## 2. Tech Stack with Justification
 
-| Layer | Technology | Version | Justification |
-|-------|-----------|---------|--------------|
-| Frontend framework | React | 19.x | Industry-standard for dashboard UIs; large ecosystem |
-| Frontend bundler | Vite | 8.x | Fast HMR; native ESM; simpler config than webpack |
-| CSS framework | Tailwind CSS | 4.x | Utility-first; no CSS files to maintain for dashboards |
-| Backend framework | FastAPI | 0.110+ | Async Python; auto Swagger UI; Pydantic validation built-in |
-| Backend server | Uvicorn | 0.29+ | ASGI; required for FastAPI async routes |
-| Data validation | Pydantic | 2.x | Strict typing; auto-generates OpenAPI schema |
-| HTTP client | httpx | 0.27+ | Async; used to call gold-api.com |
-| ML — regression | scikit-learn | 1.4+ | Polynomial Ridge pipeline; proven, stable |
-| ML — numerics | NumPy | 1.26+ | Array operations for model training and prediction |
-| Data generation | Faker | 24+ | Generates realistic dummy customer data |
-| Env management | python-dotenv | 1.0+ | Loads `.env` for secrets (UAE PASS credentials) |
+### Frontend
+
+| Technology | Version | Justification |
+|-----------|---------|---------------|
+| React | 19.2 | Industry-standard component model; hooks-based state suits the two-screen toggle pattern; large ecosystem |
+| Vite | 8.x | Instant HMR, native ESM, fastest cold-start for a single-file SPA of this size |
+| Tailwind CSS | v4.x | Utility-first CSS eliminates class-naming overhead; v4 ships as a Vite plugin (zero PostCSS config) |
+| `@tailwindcss/vite` | 4.2 | Native Vite plugin — no separate PostCSS or config files needed |
+| Vanilla `fetch` | — | No React Query or Axios needed; only 2 API call patterns in the app |
+
+### Backend
+
+| Technology | Version | Justification |
+|-----------|---------|---------------|
+| Python | 3.11+ | Mature ML ecosystem (`scikit-learn`, `numpy`); FastAPI requires 3.8+ |
+| FastAPI | 0.110+ | Async-first, automatic Swagger UI, Pydantic-native; ideal for typed ML service APIs |
+| Uvicorn | 0.29+ | ASGI server with `--reload` for development; production-ready with workers |
+| Pydantic v2 | 2.6+ | Fast validation, native JSON serialization, strict typing enforced at API boundaries |
+| httpx | 0.27+ | Async HTTP client for calling `gold-api.com`; drop-in `requests` replacement for `async` contexts |
+| scikit-learn | 1.4+ | Ridge regression + PolynomialFeatures pipeline; NumPy fallback present if unavailable |
+| NumPy | 1.26+ | Array operations for date ordinals and polynomial fitting |
+| Faker | 24+ | Used only in `seed_data.py` to generate realistic dummy customer data |
+| python-dotenv | 1.0+ | Loads `.env` for UAE PASS credentials |
 
 ---
 
 ## 3. Folder / Module Structure
 
 ```
-mobcoder-gold-poc/
+GOLD-LTV-AI-calculator/
 ├── src/
-│   ├── App.jsx                    # Root: state, screen routing, API calls
-│   ├── App.css                    # Global overrides
-│   ├── index.css                  # Tailwind base import
-│   ├── main.jsx                   # ReactDOM.createRoot entry
+│   ├── App.jsx                    # Root component: state, API calls, screen toggle
+│   ├── App.css                    # Global styles (minimal)
+│   ├── main.jsx                   # React DOM entry point
+│   ├── index.css                  # Tailwind CSS import
+│   ├── assets/                    # Static images
 │   └── components/
-│       └── GoldLoanWorkspace.jsx  # Calculator form + reverse calculator + rates panel
+│       └── GoldLoanWorkspace.jsx  # Calculator form + reverse calculator layout
+│
+├── public/
+│   ├── favicon.svg
+│   └── icons.svg
+│
 ├── backend/
-│   ├── main.py                    # FastAPI app + all route handlers
-│   ├── models.py                  # Pydantic enums + request/response models
-│   ├── seed_data.py               # One-time script: generates dummy_*.json files
+│   ├── main.py                    # FastAPI app, all route handlers
+│   ├── models.py                  # All Pydantic request/response models
+│   ├── seed_data.py               # One-time data generation script
 │   ├── requirements.txt
-│   ├── .env                       # (git-ignored) UAE PASS credentials
+│   ├── .env                       # UAEPASS_CLIENT_ID / SECRET (not committed)
+│   ├── data/
+│   │   ├── gold_history.json      # 20-year daily gold prices (AED/oz)
+│   │   ├── dummy_customers.json   # Seeded customer profiles
+│   │   └── dummy_loans.json       # Seeded loan records
 │   └── services/
-│       ├── gold_service.py        # Live price fetch + ML prediction pipeline
-│       ├── loan_calculator.py     # LTV calculation with all adjustment multipliers
-│       ├── risk_analyzer.py       # User + company risk scoring
-│       ├── customer_service.py    # JSON-backed customer + loan lookup
-│       └── uaepass_service.py     # UAE PASS identity stub
-│   └── data/
-│       ├── gold_history.json      # 20-year daily gold prices (required)
-│       ├── dummy_customers.json   # Seeded customer records
-│       └── dummy_loans.json       # Seeded loan history records
-├── docs/                          # Project documentation
-├── public/                        # Static assets (favicon, icons)
-├── index.html                     # Vite HTML entry point
-├── vite.config.js
+│       ├── gold_service.py        # Live fetch + ML prediction pipeline
+│       ├── customer_service.py    # Profile + loan history lookup
+│       ├── loan_calculator.py     # LTV multiplier chain + decision engine
+│       ├── risk_analyzer.py       # User risk + company risk scoring
+│       └── uaepass_service.py     # UAE PASS identity stub / production hook
+│
+├── docs/
+│   ├── PLAN.md
+│   ├── ARCHITECTURE.md            # (this file)
+│   └── BRD.md
+│
+├── CALCULATIONS.md                # Full formula reference
+├── CLAUDE.md                      # Claude Code project context
 ├── package.json
+├── vite.config.js
 ├── eslint.config.js
-└── CALCULATIONS.md                # Full formula reference
+└── index.html
 ```
 
 ---
@@ -111,125 +124,153 @@ mobcoder-gold-poc/
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| `App` | `src/App.jsx` | Global state, screen switching (`calculator` ↔ `summary`), API calls |
-| `GoldLoanWorkspace` | `src/components/GoldLoanWorkspace.jsx` | Loan form, live rate table, reverse calculator, today's score |
-| `RiskGauge` | inline in `App.jsx` | SVG arc gauge for user/company risk score |
-| `CibilGauge` | inline in `App.jsx` | SVG arc gauge for CIBIL score |
-| `PredictedLtvGoldTrendChart` | inline in `App.jsx` | SVG polyline chart for historical + predicted gold prices |
+| `App` | `src/App.jsx` | Root state machine: form data, live rates, today's score, active screen, valuation result. Owns all API fetch calls. |
+| `GoldLoanWorkspace` | `src/components/GoldLoanWorkspace.jsx` | Renders calculator form, live rate ticker, reverse calculator panel, and Today's Loan Score badge. Props-only (no local API calls). |
+| `CalculatorScreen` | Inline in `App.jsx` | Form inputs: carat, Emirates ID, gold weight, gold type, tenure, profession. Calls `handleCalculate` on submit. |
+| `SummaryScreen` | Inline in `App.jsx` | Full eligibility dashboard. Renders all sections of `LoanCalculationResponse`. |
+| `RiskGauge` | Inline in `App.jsx` | SVG radial gauge for user risk / company risk scores (0–100). |
+| `CibilGauge` | Inline in `App.jsx` | SVG radial gauge for CIBIL score display. |
+| `PredictedLtvGoldTrendChart` | Inline in `App.jsx` | SVG polyline chart rendering historical + predicted gold prices. |
 
 ### Backend Services
 
 | Service | File | Responsibility |
 |---------|------|----------------|
-| Gold Service | `services/gold_service.py` | Fetch live XAU/USD; load history; fit ML models; predict; build `GoldInsights` |
-| Loan Calculator | `services/loan_calculator.py` | Gold valuation; LTV with all multipliers; eligible amounts; system decision |
-| Risk Analyzer | `services/risk_analyzer.py` | User risk score (0–100); company risk score (0–100); labels |
-| Customer Service | `services/customer_service.py` | Load customer profile and loan history from JSON by Emirates ID |
-| UAE PASS Service | `services/uaepass_service.py` | Stub identity enrichment; returns hardcoded profiles for 3 known IDs |
+| **Gold Service** | `services/gold_service.py` | Fetch live XAU/USD → AED/gram; load 20-year history; fit polynomial + linear models; generate blended forecast; build `GoldInsights`. |
+| **Customer Service** | `services/customer_service.py` | Load and return `CustomerProfile` and `LoanHistoryOverview` from JSON files by Emirates ID. |
+| **Loan Calculator** | `services/loan_calculator.py` | Apply LTV multiplier chain; compute gold valuation; compute eligible loan amount; run decision scoring; return all fields for `LoanCalculationResponse`. |
+| **Risk Analyzer** | `services/risk_analyzer.py` | Compute user risk score (5 components, max 100) and company risk score (3 components, max 100); return `RiskInsights`. |
+| **UAE PASS Service** | `services/uaepass_service.py` | Return stub identity profile for known Emirates IDs; production OAuth2 hook in place. |
 
 ---
 
 ## 5. Data Flow Diagrams
 
-### Main Loan Calculation Flow
+### 5a. Application Startup (Page Load)
 
 ```mermaid
 sequenceDiagram
-    participant FE as React Frontend
-    participant API as FastAPI /loan/calculate
-    participant CS as customer_service
-    participant UP as uaepass_service
-    participant GS as gold_service
-    participant LC as loan_calculator
-    participant RA as risk_analyzer
-    participant EXT as gold-api.com
+    participant Browser
+    participant App.jsx
+    participant Backend
 
-    FE->>API: POST /loan/calculate {emirates_id, carat, gold_type, weight, tenure, profession}
-
-    API->>CS: get_customer_profile(emirates_id)
-    CS-->>API: CustomerProfile
-
-    API->>CS: get_loan_history(emirates_id)
-    CS-->>API: LoanHistoryOverview
-
-    API->>UP: fetch_uaepass_profile(emirates_id)
-    UP-->>API: enriched fields (or None)
-
-    API->>GS: fetch_live_gold_price_aed_karats()
-    GS->>EXT: GET /price/XAU
-    EXT-->>GS: {price: USD/oz}
-    GS-->>API: karats dict (AED/gram per karat)
-
-    API->>GS: build_gold_insights(tenure_months)
-    Note over GS: Load history → fit models → predict → build GoldInsights
-    GS-->>API: GoldInsights
-
-    API->>LC: calculate_ltv_and_loan(...)
-    Note over LC: valuation × LTV multipliers → eligible amount → decision
-    LC-->>API: calc dict
-
-    API->>RA: build_risk_insights(...)
-    Note over RA: user_risk + company_risk → labels
-    RA-->>API: RiskInsights
-
-    API-->>FE: LoanCalculationResponse (full dashboard payload)
+    Browser->>App.jsx: Page load
+    App.jsx->>Backend: GET /api/gold-rate/live
+    App.jsx->>Backend: GET /api/gold-loan-score/today
+    Backend-->>App.jsx: { karats: { 24K: ..., 22K: ... }, currency, unit }
+    Backend-->>App.jsx: { score, label, market_condition, guidance }
+    App.jsx->>Browser: Render calculator with live rates + score badge
 ```
 
-### Gold Price Feed Flow
+### 5b. Loan Calculation Request
 
 ```mermaid
-flowchart LR
-    A["gold-api.com\nXAU/USD"] -->|"httpx async GET"| B["fetch_live_gold_price_aed_karats()"]
-    B -->|"÷ 31.1035 × 3.6725"| C["AED/gram (24K)"]
-    C -->|"× purity factor per karat"| D["karats dict\n{24K, 22K, 21K, 18K, 14K}"]
-    E["gold_history.json\n20yr AED/oz"] --> F["_load_history()"]
-    F --> G["_fit_models()\nModel A: Poly Ridge deg-3\nModel B: Linear 365-day"]
-    G --> H["_predict(tenure)\n65% long + 35% momentum\n+ live-price anchor"]
-    H --> I["GoldInsights\n(historical + predicted AED/gram)"]
-    D --> I
+sequenceDiagram
+    participant Browser
+    participant App.jsx
+    participant main.py
+    participant gold_service
+    participant customer_service
+    participant loan_calculator
+    participant risk_analyzer
+    participant uaepass_service
+    participant GoldAPI as gold-api.com
+
+    Browser->>App.jsx: Submit form
+    App.jsx->>main.py: POST /loan/calculate { emirates_id, carat, gold_type, weight, tenure, profession }
+
+    main.py->>customer_service: get_customer_profile(emirates_id)
+    customer_service-->>main.py: CustomerProfile
+
+    main.py->>customer_service: get_loan_history(emirates_id)
+    customer_service-->>main.py: LoanHistoryOverview
+
+    main.py->>uaepass_service: fetch_uaepass_profile(emirates_id)
+    uaepass_service-->>main.py: UAE PASS profile dict (or None)
+
+    main.py->>gold_service: fetch_live_gold_price_aed_karats()
+    gold_service->>GoldAPI: GET /price/XAU
+    GoldAPI-->>gold_service: { price: 3285.4, ... }
+    gold_service-->>main.py: { 24K: 388.2, 22K: 355.8, ... }
+
+    main.py->>gold_service: build_gold_insights(tenure_months)
+    gold_service->>gold_service: Load gold_history.json
+    gold_service->>gold_service: Fit polynomial + linear models
+    gold_service->>gold_service: Blend forecast (65/35)
+    gold_service-->>main.py: GoldInsights
+
+    main.py->>loan_calculator: calculate_ltv_and_loan(...)
+    loan_calculator-->>main.py: { ltv, eligible_amount, decision, breakdown, ... }
+
+    main.py->>risk_analyzer: build_risk_insights(...)
+    risk_analyzer-->>main.py: RiskInsights
+
+    main.py-->>App.jsx: LoanCalculationResponse (full payload)
+    App.jsx->>Browser: Navigate to SummaryScreen
+```
+
+### 5c. ML Prediction Pipeline (inside `gold_service.py`)
+
+```mermaid
+flowchart TD
+    A[gold_history.json<br/>20 years daily prices] --> B[Load & sort by date]
+    B --> C[Convert dates to ordinal integers]
+    C --> D1[Model A: Polynomial degree-3 Ridge<br/>trained on all 20 years<br/>x normalised to 0–1]
+    C --> D2[Model B: Linear regression<br/>trained on last 365 days]
+    E[Live XAU/USD from gold-api.com] --> F[Compute anchor_shift<br/>live_price − blended_at_day_0]
+    D1 --> G[Blend: 65% Model A + 35% Model B]
+    D2 --> G
+    G --> H[Apply anchor_shift so chart has no seam gap]
+    H --> I[Add compounding Gaussian noise<br/>σ = 0.6% × price × sqrt month]
+    F --> H
+    I --> J[predicted_prices list: AED/gram per month]
+    J --> K[pct_change = end_price / live_price − 1]
+    K --> L{Classify trend}
+    L -->|> +2%| M[RISING]
+    L -->|-2% to +2%| N[STABLE]
+    L -->|< -2%| O[FALLING]
 ```
 
 ---
 
 ## 6. API Design / Endpoints
 
-All endpoints served by FastAPI on **port 8001**.  
-Swagger UI: `http://localhost:8001/docs`
+Base URL: `http://127.0.0.1:8001`
 
-| Method | Path | Tag | Description |
-|--------|------|-----|-------------|
-| `GET` | `/health` | System | Health check |
-| `GET` | `/gold/price` | Gold | Live XAU → AED/gram (all karats) |
-| `GET` | `/api/gold-rate/live` | Gold | Live AED rates per karat (frontend format) |
-| `GET` | `/api/gold-loan-score/today` | Gold | ML-based 1–10 timing score |
-| `GET` | `/gold/insights` | Gold | Historical prices + tenure prediction |
-| `GET` | `/customer/{emirates_id}` | Customer | Customer profile lookup |
-| `GET` | `/customer/{emirates_id}/loans` | Customer | Loan history overview |
-| `POST` | `/loan/calculate` | Loan | Full eligibility pipeline — main endpoint |
+| Method | Endpoint | Tag | Description | Auth |
+|--------|----------|-----|-------------|------|
+| `GET` | `/health` | System | Service health check | None |
+| `GET` | `/gold/price` | Gold | Live XAU/USD → AED/gram per karat | None |
+| `GET` | `/api/gold-rate/live` | Gold | Same as above, alternate path used by frontend | None |
+| `GET` | `/api/gold-loan-score/today` | Gold | ML-based 1–10 timing score for loan action today | None |
+| `GET` | `/gold/insights?tenure_months=12` | Gold | Historical prices + ML forecast for given tenure | None |
+| `GET` | `/customer/{emirates_id}` | Customer | Customer profile lookup | None |
+| `GET` | `/customer/{emirates_id}/loans` | Customer | Loan history overview | None |
+| `POST` | `/loan/calculate` | Loan | Full calculation pipeline → eligibility dashboard payload | None |
 
-### Request Model: `POST /loan/calculate`
+### `POST /loan/calculate` — Request Schema
 
 ```json
 {
   "emirates_id": "784-1985-1234567-1",
   "carat": "22K",
   "gold_type": "Jewellery",
-  "gold_weight_grams": 100.0,
+  "gold_weight_grams": 150.0,
   "tenure_months": 12,
   "job_profession": "Government Employee"
 }
 ```
 
-### Response Model: `LoanCalculationResponse`
+### `POST /loan/calculate` — Response Schema (abbreviated)
 
 ```json
 {
   "system_decision": "Pre-Approved",
-  "recommended_ltv_pct": 67.5,
-  "gold_valuation_aed": 32083.33,
-  "eligible_loan_amount_aed": 21656.25,
-  "future_gold_valuation_aed": 33500.00,
-  "future_eligible_loan_amount_aed": 21956.25,
+  "recommended_ltv_pct": 72.98,
+  "gold_valuation_aed": 48750.00,
+  "eligible_loan_amount_aed": 35594.00,
+  "future_gold_valuation_aed": 51200.00,
+  "future_eligible_loan_amount_aed": 36249.00,
   "suggested_tenure_months": 12,
   "cibil_score": 780,
   "cibil_label": "Excellent",
@@ -240,7 +281,7 @@ Swagger UI: `http://localhost:8001/docs`
   "gold_insights": { ... },
   "risk_insights": { ... },
   "live_gold_currency": "AED",
-  "live_gold_rates": { "24K": 387.12, "22K": 354.73, ... }
+  "live_gold_rates": { "24K": 388.2, "22K": 355.8, ... }
 }
 ```
 
@@ -248,101 +289,88 @@ Swagger UI: `http://localhost:8001/docs`
 
 ## 7. Data Models
 
-### Core Enums
+### Enumerations
 
 | Enum | Values |
 |------|--------|
-| `CaratType` | 24K, 22K, 21K, 18K, 14K |
-| `TenureMonths` | 6, 12, 18, 24, 36, 48 |
+| `CaratType` | `24K`, `22K`, `21K`, `18K`, `14K` |
+| `TenureMonths` | `6`, `12`, `18`, `24`, `36`, `48` |
 | `JobProfession` | Government Employee, Private Employee, Business Owner, Self Employed, Retired, Freelancer |
 | `GoldType` | Coin, Jewellery, Stone Jewellery |
 | `LoanStatus` | ACTIVE, CLOSED, DEFAULTED |
 | `RiskCategory` | A+, A, B+, B, C, D |
 
-### Key Data Structures
+### Core Models
 
-```mermaid
-classDiagram
-    class LoanCalculationRequest {
-        +str emirates_id
-        +CaratType carat
-        +GoldType gold_type
-        +float gold_weight_grams
-        +TenureMonths tenure_months
-        +JobProfession job_profession
-    }
+```
+LoanCalculationRequest
+  emirates_id: str
+  carat: CaratType
+  gold_type: GoldType
+  gold_weight_grams: float (> 0)
+  tenure_months: TenureMonths
+  job_profession: JobProfession
 
-    class CustomerProfile {
-        +str customer_name
-        +str emirates_id
-        +str nationality
-        +str mobile
-        +str customer_type
-        +RiskCategory risk_category
-        +int cibil_score
-        +Optional gender
-        +Optional email
-        +bool uaepass_verified
-    }
+CustomerProfile
+  customer_name, emirates_id, nationality, mobile
+  customer_type: "Existing" | "New"
+  risk_category: RiskCategory
+  cibil_score: int
+  gender?, email?, full_name_ar?, nationality_ar?  (UAE PASS enriched)
+  uaepass_verified: bool
 
-    class GoldInsights {
-        +float live_price_aed_per_gram
-        +List historical_prices
-        +List predicted_prices
-        +float predicted_change_pct
-        +str trend
-        +float predicted_end_price_aed_per_gram
-    }
+LoanHistoryOverview
+  total_previous, active_loans, closed_loans
+  missed_emis, outstanding_balance
+  loan_items: List[LoanHistoryItem]
 
-    class LTVBreakdown {
-        +float base_ltv_pct
-        +float carat_adjustment_pct
-        +float gold_type_adjustment_pct
-        +float tenure_adjustment_pct
-        +float cibil_adjustment_pct
-        +float active_loans_adjustment_pct
-        +float profession_adjustment_pct
-        +float gold_trend_adjustment_pct
-        +float final_ltv_pct
-    }
+GoldInsights
+  live_price_aed_per_gram: float
+  historical_prices: List[GoldPricePoint]  (last 3 months)
+  predicted_prices: List[GoldPricePoint]   (next N months)
+  predicted_change_pct: float
+  trend: "RISING" | "STABLE" | "FALLING"
+  predicted_end_price_aed_per_gram: float
 
-    class RiskInsights {
-        +float user_risk_score
-        +str user_risk_label
-        +float company_risk_score
-        +str company_risk_label
-        +str company_risk_exposure
-    }
+LTVBreakdown
+  base_ltv_pct, carat_adjustment_pct, gold_type_adjustment_pct
+  tenure_adjustment_pct, cibil_adjustment_pct
+  active_loans_adjustment_pct, profession_adjustment_pct
+  gold_trend_adjustment_pct, final_ltv_pct
+
+RiskInsights
+  user_risk_score: float (0–100)
+  user_risk_label: str
+  company_risk_score: float (0–100)
+  company_risk_label: str
+  company_risk_exposure: "LOW" | "MEDIUM" | "HIGH" | "VERY HIGH"
 ```
 
-### Data File Schemas
+### Data Files
 
-**`dummy_customers.json`** — array of customer objects:
-```json
-[{ "emirates_id": "...", "customer_name": "...", "cibil_score": 780, "risk_category": "A+", ... }]
-```
-
-**`dummy_loans.json`** — array of loan objects keyed by Emirates ID:
-```json
-[{ "emirates_id": "...", "loans": [{ "loan_id": "...", "status": "ACTIVE", "missed_emis": 0, ... }] }]
-```
-
-**`gold_history.json`** — array of daily price records:
-```json
-[{ "day": "2005-01-03", "max_price": 195.40 }, ...]
-```
+| File | Format | Size | Contents |
+|------|--------|------|----------|
+| `gold_history.json` | `[{"day": "YYYY-MM-DD", "max_price": float}]` | ~7,300 rows | 20 years daily gold prices (AED/oz) |
+| `dummy_customers.json` | `[{CustomerProfile fields}]` | 3 records | Seeded by `seed_data.py` |
+| `dummy_loans.json` | `[{LoanHistoryItem fields}]` | Variable | Seeded by `seed_data.py` |
 
 ---
 
 ## 8. Authentication & Authorization
 
-**Current state:** No authentication or authorization is implemented. The API accepts all requests.
+**Current state:** None. All API endpoints are publicly accessible with CORS `allow_origins=["*"]`.
 
-**Production recommendations:**
-- Add JWT-based auth (e.g., using `python-jose` + `fastapi-users`)
-- Protect all `/loan/calculate` and customer endpoints with role-based access
-- UAE PASS OAuth 2.0 integration: set `UAEPASS_CLIENT_ID` + `UAEPASS_CLIENT_SECRET` in `.env`
-- Scope-based access: credit officers vs. read-only analysts
+**UAE PASS (stubbed):**
+The `uaepass_service.py` module has a production-ready placeholder for OAuth2 Client Credentials flow:
+1. `POST /idshub/token` → obtain `access_token`
+2. `GET /idshub/userinfo` → fetch verified identity profile
+3. Emirates ID in response is cross-checked against the request for security.
+
+**Production requirements:**
+- Set `UAEPASS_CLIENT_ID` + `UAEPASS_CLIENT_SECRET` in `backend/.env`
+- Uncomment the production path in `fetch_uaepass_profile()`
+- Restrict CORS to the known frontend origin
+- Add API key or JWT middleware for the FastAPI endpoints
 
 ---
 
@@ -350,32 +378,31 @@ classDiagram
 
 | Concern | Current State | Production Path |
 |---------|--------------|-----------------|
-| Gold API latency | ~100–200ms per request to gold-api.com | Cache live price for 60s using Redis or in-memory LRU |
-| ML model fitting | Fits models on every request (re-reads JSON each time) | Pre-fit at startup; cache models in memory |
-| Data layer | JSON flat files (synchronous reads) | PostgreSQL / MongoDB with proper indexing |
-| Concurrent users | Uvicorn handles async routes well | Add workers (`uvicorn --workers 4`) or switch to Gunicorn |
-| Frontend bundle | Single Vite bundle | CDN + cache-control headers |
-| Historical data loading | JSON read + sort on every request | Load once at startup into module-level variable |
+| **Gold history ML fit** | Fitted on every `/loan/calculate` request (~50ms) | Cache fitted models in memory at startup; re-fit on schedule |
+| **Customer data** | JSON file read from disk per request | Replace with PostgreSQL + indexed Emirates ID column |
+| **Live gold API** | 1 HTTP call per request, 8s timeout | Add Redis cache with 60s TTL; avoid hammering the external API |
+| **FastAPI concurrency** | Async handlers; single process | Run with `--workers 4` (Gunicorn + Uvicorn workers) in production |
+| **Frontend bundle** | ~200KB gzipped (React + Tailwind) | Static CDN hosting; Vite build already tree-shakes and minifies |
+| **Gold history file** | Loaded fresh per request | Load once at module import level and keep in memory |
 
 ---
 
 ## 10. Security Considerations
 
-| Area | Current | Required for Production |
-|------|---------|------------------------|
-| CORS | `allow_origins=["*"]` | Restrict to known frontend origins |
-| Input validation | Pydantic enforces types and ranges | Already strict; add rate limiting |
-| Secrets | `.env` file (git-ignored) | Use environment secrets manager (AWS Secrets Manager, Azure Key Vault) |
-| Error messages | FastAPI returns detailed 422/404 errors | Sanitize error responses; never expose stack traces |
-| HTTPS | Not configured (dev only) | TLS termination via reverse proxy (Nginx / Caddy) |
-| Auth | None | JWT + role-based access |
+| Risk | Current Mitigation | Recommended Fix |
+|------|-------------------|-----------------|
+| CORS `allow_origins=["*"]` | None | Restrict to frontend origin in production |
+| No input sanitization on Emirates ID path param | FastAPI validates type (str) | Add regex pattern validation: `^784-\d{4}-\d{7}-\d$` |
+| `backend/.env` committed? | `.env` listed — verify `.gitignore` | Ensure `.env` is in `.gitignore`; use secrets manager in production |
+| Dummy customer data in repo | Faker-generated, not real PII | Confirm before production; do not seed real data in repo |
+| External API (gold-api.com) | HTTPS; fallback if unreachable | Pin expected response schema; validate before using price |
+| No rate limiting | Open endpoints | Add `slowapi` or nginx rate-limit in production |
 
 ---
 
 ## 11. Third-Party Integrations
 
-| Service | Purpose | Method | Fallback |
-|---------|---------|--------|---------|
-| `api.gold-api.com` | Live XAU/USD gold spot price | Async HTTP GET | `FALLBACK_USD_OZ = 3300.0 USD/oz` |
-| UAE PASS | National identity enrichment (name, nationality, contact) | OAuth 2.0 (stubbed) | Original customer record used unchanged |
-| scikit-learn | Polynomial regression for price prediction | Python import | NumPy `polyfit` fallback |
+| Integration | Endpoint | Protocol | Fallback |
+|-------------|----------|----------|---------|
+| **gold-api.com** — live XAU/USD | `https://api.gold-api.com/price/XAU` | HTTPS REST | `FALLBACK_USD_OZ = 3300.0` |
+| **UAE PASS** — identity verification | `https://id.uaepass.ae/idshub/` | OAuth2 + HTTPS REST | Stub profiles for 3 seeded IDs |

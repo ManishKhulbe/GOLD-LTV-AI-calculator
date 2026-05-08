@@ -1,197 +1,245 @@
 # BRD.md — Business Requirements Document
+# Gold Loan Valuation & Eligibility Dashboard — Finance House Dubai
 
-**Project:** Gold Loan Valuation & Eligibility Dashboard  
-**Client:** Finance House Dubai  
-**Prepared for:** Credit Risk & Operations Team  
 **Version:** 1.0  
-**Date:** 2026-05-08
+**Date:** 2026-05-08  
+**Status:** Draft  
 
 ---
 
 ## 1. Executive Summary
 
-Finance House Dubai requires an automated digital tool to replace the manual, spreadsheet-driven process of evaluating gold-backed loan applications. The Gold Loan Valuation & Eligibility Dashboard provides credit officers with an instant, data-driven assessment of a customer's gold collateral value, loan eligibility (LTV), credit risk, and market timing — all from a single web-based interface. The system integrates live gold market data, 20-year ML-powered price prediction, CIBIL-based credit scoring, and UAE PASS national identity enrichment to produce an auditable, consistent loan decision within seconds.
+Finance House Dubai offers gold-backed loans as a core product. Currently, loan officers perform valuations using spreadsheets and manual lookups for gold prices, CIBIL scores, and policy multipliers — a process that is slow, error-prone, and inconsistent across branches.
+
+This project delivers a digital Gold Loan Valuation & Eligibility Dashboard: a web-based tool that automates gold valuation, applies all regulatory and internal LTV multipliers in real time, uses a machine learning model to forecast gold price trends, and issues an eligibility decision within seconds. The system also provides dual risk scoring (borrower risk and institution risk) to support credit officers in making consistent, defensible lending decisions.
 
 ---
 
 ## 2. Business Problem / Opportunity
 
-### Problem
-Gold loan appraisals at Finance House Dubai are currently performed manually by credit officers using spreadsheets. This process suffers from:
+### Problem Statement
 
-- **Inconsistency:** Different officers apply different LTV assumptions and carat corrections.
-- **Latency:** Manual lookups (gold price, customer history, risk scoring) take 15–30 minutes per application.
-- **Stale data:** Spreadsheets use end-of-day gold prices rather than live market rates.
-- **No predictive insight:** Officers have no view of how gold prices may change over the loan tenure, creating unquantified collateral risk.
-- **Manual risk subjectivity:** Credit risk is assessed qualitatively, not scored consistently.
+| Problem | Impact |
+|---------|--------|
+| Manual gold price lookup and spreadsheet-based LTV calculation | 10–15 minutes per application; inconsistent results across officers |
+| No standardized risk scoring for gold loan applicants | Inconsistent credit decisions; regulatory exposure |
+| No forward-looking gold price context at point of decision | Loan officers unaware of collateral value trends during loan tenure |
+| UAE PASS identity not integrated at application stage | Duplicate data entry; identity verification done manually |
+| No historical or predicted gold price visibility for the customer | Reduced customer confidence; longer sales cycle |
 
 ### Opportunity
-Automating the gold loan valuation pipeline eliminates inconsistency, reduces processing time from 30 minutes to under 30 seconds, and gives officers a quantified, ML-backed view of collateral risk over the loan tenure.
+
+Automating this workflow reduces per-application time from ~15 minutes to under 30 seconds, standardizes credit decisions across all branches, and creates an auditable record of the inputs and outputs for every application.
 
 ---
 
 ## 3. Project Objectives (SMART Goals)
 
-| # | Objective | Specific | Measurable | Achievable | Relevant | Time-bound |
-|---|-----------|----------|-----------|-----------|---------|-----------|
-| 1 | Automate gold valuation | Compute AED gold value from live XAU/USD spot in real time | Valuation accurate to ±0.1% of manual calculation | Yes — gold-api.com integration | Reduces officer time | Phase 3 |
-| 2 | Standardize LTV calculation | Apply 6-factor LTV multiplier chain consistently for all officers | 100% of calculations use the same formula | Yes — code-enforced | Eliminates inconsistency | Phase 2 |
-| 3 | Predict gold price trajectory | ML model forecasts gold price change over 6–48 month tenure | Prediction anchored to live price; within ±5% of 3-month actuals | Yes — 20yr dataset + polynomial blend | Informs collateral risk | Phase 3 |
-| 4 | Score credit risk quantitatively | Produce 0–100 user and company risk scores | Scores derived from CIBIL, EMI history, active loans, profession | Yes — implemented | Replaces subjective assessment | Phase 4 |
-| 5 | Reduce processing time | End-to-end loan assessment from officer input to decision | Decision rendered in under 5 seconds (excluding external API latency) | Yes — async FastAPI | Directly reduces cost | Phase 6 |
+| # | Objective | Metric | Target | Timeframe |
+|---|-----------|--------|--------|-----------|
+| 1 | Reduce loan officer calculation time | Minutes per application | < 1 minute (from ~15) | At launch |
+| 2 | Standardize LTV decisions | LTV deviation across officers for identical inputs | 0% (fully deterministic) | At launch |
+| 3 | Provide real-time gold prices | Seconds from page load to live AED/gram display | < 3 seconds | At launch |
+| 4 | ML gold price forecast accuracy | MAE vs actuals in backtesting (12-month horizon) | < 8% | Before go-live |
+| 5 | Risk scoring coverage | % of applications with computed user + company risk | 100% | At launch |
+| 6 | UAE PASS enrichment | % of known Emirates IDs returning verified profile | 100% (for seeded IDs) | At launch |
+| 7 | System availability | Uptime (excl. maintenance) | > 99.5% | First 6 months |
 
 ---
 
 ## 4. Stakeholders & Roles
 
-| Stakeholder | Role | Interests |
-|-------------|------|-----------|
-| Finance House Dubai — Credit Officers | Primary users | Fast, accurate eligibility decisions; clear risk signals |
-| Finance House Dubai — Credit Risk Manager | Decision approver | Consistent, auditable LTV calculations; risk band compliance |
-| Finance House Dubai — IT / Operations | System owners | Reliable uptime; easy maintenance; clear documentation |
-| Loan Applicants (Customers) | Indirect beneficiaries | Faster decisions; fair, consistent assessment |
-| UAE PASS Authority | Integration partner | Accurate identity enrichment (currently stubbed) |
-| External Gold Data Provider (gold-api.com) | Data supplier | API reliability and accuracy |
+| Stakeholder | Role | Interest |
+|-------------|------|---------|
+| Finance House Dubai — Credit Officers | Primary users | Fast, accurate eligibility decisions |
+| Finance House Dubai — Branch Managers | Secondary users | Consistent decisions; audit trail |
+| Finance House Dubai — Risk / Compliance | Governance | LTV caps, regulatory alignment, risk scoring |
+| Finance House Dubai — IT / DevOps | Operators | Deployment, uptime, integration with existing systems |
+| UAE Central Bank (CBUAE) | Regulator | LTV regulatory ceiling (75%) compliance |
+| UAE PASS (TRA) | Identity provider | OAuth2 integration; digital identity verification |
+| gold-api.com | Data provider | Live XAU/USD price feed |
+| Development Team (Mobcoder) | Builders | System design, implementation, documentation |
 
 ---
 
 ## 5. Functional Requirements (User Stories)
 
-### 5.1 Gold Valuation
+### 5.1 Gold Price & Market Data
 
-**US-001:** As a credit officer, I want to enter the gold weight (grams), carat, and gold type so that the system calculates the current AED market value of the collateral.
+| ID | User Story | Priority | Acceptance Criteria |
+|----|-----------|----------|---------------------|
+| FR-01 | As a loan officer, I want to see live AED/gram gold prices for all karats (24K–14K) on page load so that I can confirm the current market rate before processing an application. | High | Prices load within 3s; all 5 karats displayed; "fallback" label shown when external API is unavailable |
+| FR-02 | As a loan officer, I want a daily gold loan market score (1–10) so that I can advise the customer on the urgency or timing of their application. | Medium | Score, label, market condition, and guidance text all displayed; score changes with predicted price movement |
+| FR-03 | As a credit analyst, I want to see a chart of the past 3 months' gold prices and a ML forecast for the loan tenure so that I can assess collateral value trends. | Medium | Chart renders historical + predicted prices in AED/gram; trend label (RISING/STABLE/FALLING) shown |
 
-**US-002:** As a credit officer, I want to see the live gold price per gram for each karat (24K–14K) on the calculator screen so that I can verify the rates before submitting.
+### 5.2 Loan Application & Valuation
 
-**US-003:** As a credit officer, I want the system to show a "today's loan score" (1–10) on the calculator screen so that I can advise the customer on whether this is a good time to take a loan based on gold market conditions.
+| ID | User Story | Priority | Acceptance Criteria |
+|----|-----------|----------|---------------------|
+| FR-04 | As a loan officer, I want to enter the customer's Emirates ID, gold carat, gold type, weight in grams, loan tenure, and job profession so that the system can compute an eligibility decision. | High | All 6 fields accepted; form validates before submission; Emirates ID pattern validated |
+| FR-05 | As a loan officer, I want the system to calculate the gold valuation in AED based on live prices and purity so that the collateral value is accurate and current. | High | `gold_valuation_aed = pure_grams × live_price_aed_per_gram`; consistent with CALCULATIONS.md §2 |
+| FR-06 | As a loan officer, I want to see the recommended LTV percentage and eligible loan amount so that I can communicate the offer to the customer. | High | LTV ≤ 75%; eligible amount = `gold_valuation × final_ltv`; displayed in AED |
+| FR-07 | As a loan officer, I want a future-adjusted loan estimate at tenure end so that I can show the customer a forward-looking valuation based on ML predictions. | Medium | `future_eligible = future_gold_valuation × final_ltv × 0.97`; delta % shown vs current |
+| FR-08 | As a loan officer, I want the system to issue a decision (Pre-Approved / Manual Review) with a plain-language remark so that I know whether to proceed or escalate. | High | Decision based on scoring engine in CALCULATIONS.md §6; remark is human-readable |
 
-### 5.2 Loan Eligibility (LTV)
+### 5.3 LTV Breakdown
 
-**US-004:** As a credit officer, I want the system to compute the LTV percentage using all regulatory and risk factors (carat, gold type, tenure, CIBIL, profession, gold trend) so that I get a consistent eligibility decision every time.
+| ID | User Story | Priority | Acceptance Criteria |
+|----|-----------|----------|---------------------|
+| FR-09 | As a credit analyst, I want to see a full LTV breakdown showing the contribution of each adjustment factor so that I can explain the decision to the customer or a supervisor. | High | All 7 adjustments displayed (carat, gold type, tenure, CIBIL, active loans, profession, gold trend) with delta values |
+| FR-10 | As a credit analyst, I want to see the CIBIL score with a label (Excellent / Very Good / Good / Fair / Poor / Very Poor) so that I can quickly assess credit quality. | High | Label maps correctly to CIBIL ranges in CALCULATIONS.md §6 |
 
-**US-005:** As a credit officer, I want to see a breakdown of each LTV adjustment factor (and the delta it adds/removes) so that I can explain the decision to the customer.
+### 5.4 Customer Profile & Loan History
 
-**US-006:** As a credit officer, I want to see the eligible loan amount in AED based on the computed LTV and gold valuation so that I can communicate the maximum loan offer.
+| ID | User Story | Priority | Acceptance Criteria |
+|----|-----------|----------|---------------------|
+| FR-11 | As a loan officer, I want the system to automatically load the customer's profile (name, nationality, risk category, mobile) by Emirates ID so that I do not need to enter it manually. | High | Profile loads from `dummy_customers.json`; 404 returned for unknown IDs |
+| FR-12 | As a loan officer, I want to see the customer's loan history (active/closed/defaulted loans, missed EMIs, outstanding balance) so that I can assess their repayment track record. | High | Loan history table displays all loan records with status and amounts |
+| FR-13 | As a loan officer, I want UAE PASS verified identity data (Arabic name, gender, verified email) to be shown on the profile when available so that I can confirm identity quickly. | Medium | UAE PASS fields populated for known Emirates IDs; `uaepass_verified: true` shown on badge |
 
-**US-007:** As a credit officer, I want to see a future-adjusted loan amount (based on ML predicted gold price at tenure end) so that I can assess whether the collateral will still cover the loan at maturity.
+### 5.5 Risk Scoring
 
-### 5.3 Customer Profile & Loan History
-
-**US-008:** As a credit officer, I want to enter the customer's Emirates ID and have the system auto-populate their CIBIL score, risk category, nationality, and loan history so that I don't need to manually look up records.
-
-**US-009:** As a credit officer, I want to see the customer's full loan history (active, closed, defaulted loans; missed EMIs; outstanding balance) so that I can assess repayment behavior.
-
-**US-010:** As a credit officer, I want UAE PASS to enrich the customer profile with verified identity data (name, gender, nationality, contact) so that KYC is faster and more reliable.
-
-### 5.4 Risk Assessment
-
-**US-011:** As a credit officer, I want to see a user risk score (0–100) with a label (LOW / MEDIUM / HIGH / VERY HIGH) so that I can quickly categorize the borrower's repayment risk.
-
-**US-012:** As a credit officer, I want to see a company risk score (0–100) that accounts for both borrower risk and gold market conditions so that I understand Finance House's exposure if the borrower defaults.
-
-**US-013:** As a credit risk manager, I want the system to issue a clear system decision (Pre-Approved / Manual Review) with auditable remarks so that I can track and override decisions with full context.
-
-### 5.5 Gold Price Intelligence
-
-**US-014:** As a credit officer, I want to see a chart of historical gold prices (last 3 months, AED/gram) alongside ML-predicted prices for the loan tenure so that I can visualize collateral risk over time.
-
-**US-015:** As a credit officer, I want to see the gold trend classification (RISING / STABLE / FALLING) and the predicted percentage change so that I can factor gold market risk into my recommendation.
+| ID | User Story | Priority | Acceptance Criteria |
+|----|-----------|----------|---------------------|
+| FR-14 | As a risk manager, I want a user risk score (0–100) computed from CIBIL, missed EMIs, active loans, profession, and outstanding balance so that I have a standardized borrower risk number. | High | Score follows formula in CALCULATIONS.md §7; label shown (LOW / MEDIUM / HIGH / VERY HIGH) |
+| FR-15 | As a risk manager, I want a company risk score (0–100) computed from borrower risk, LTV exposure, and gold market outlook so that I can assess the institution's exposure on this loan. | High | Score follows CALCULATIONS.md §8; company risk can be LOW even when user risk is HIGH (rising gold offsets) |
 
 ### 5.6 Reverse Calculator
 
-**US-016:** As a customer, I want to enter a desired loan amount and see how many grams of gold (by karat) I need to pledge so that I know how much gold to bring.
+| ID | User Story | Priority | Acceptance Criteria |
+|----|-----------|----------|---------------------|
+| FR-16 | As a customer-facing officer, I want to enter a desired loan amount and see how many grams of each karat are needed to qualify so that I can guide customers who are preparing their gold collateral. | Medium | Reverse calculator outputs grams per karat for a given AED loan amount; live rates used in calculation |
 
 ---
 
 ## 6. Non-Functional Requirements
 
-| Category | Requirement | Target |
-|----------|-------------|--------|
-| Performance | Loan calculation response time | < 5 seconds end-to-end (including gold API call) |
-| Performance | Dashboard render on submission | < 1 second after API response received |
-| Availability | Backend uptime | ≥ 99.5% during business hours |
-| Reliability | Gold API fallback | System must remain operational if gold-api.com is unreachable |
-| Security | Input validation | All request fields validated; invalid inputs return 422 with details |
-| Security | No PII in logs | Customer names, Emirates IDs never written to server logs |
-| Security | CORS | In production, restrict to known frontend origins only |
-| Usability | Screen resolution | Dashboard usable at 1280×800 desktop resolution and above |
-| Usability | Error states | Calculator shows clear error message on API failure |
-| Maintainability | Formula documentation | All LTV factors documented in CALCULATIONS.md |
-| Scalability | Concurrent users | System handles at least 50 simultaneous officer sessions |
-| Data freshness | Gold price | Live price fetched per request; not cached stale |
+### 6.1 Performance
+
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NFR-01 | Page load time (live rates + today's score) | < 3 seconds on standard broadband |
+| NFR-02 | Loan calculation response time (`POST /loan/calculate`) | < 2 seconds end-to-end |
+| NFR-03 | Gold price fallback activation | < 8 seconds (httpx timeout); no visible error to user beyond "fallback" label |
+| NFR-04 | Frontend bundle size | < 500KB gzipped |
+
+### 6.2 Security
+
+| ID | Requirement |
+|----|-------------|
+| NFR-05 | Backend CORS restricted to known frontend origin in production |
+| NFR-06 | UAE PASS credentials stored in environment variables; never committed to version control |
+| NFR-07 | Emirates ID path parameter validated against expected pattern before lookup |
+| NFR-08 | No real customer PII in the repository (seed data uses Faker-generated values) |
+| NFR-09 | All external HTTP calls use HTTPS |
+
+### 6.3 Scalability
+
+| ID | Requirement |
+|----|-------------|
+| NFR-10 | Backend supports at least 50 concurrent loan calculation requests |
+| NFR-11 | Gold history ML model fit must complete in < 200ms (currently ~50ms on MacBook M-series) |
+| NFR-12 | Customer data store supports replacement with a relational database without API contract changes |
+
+### 6.4 Usability
+
+| ID | Requirement |
+|----|-------------|
+| NFR-13 | Dashboard renders correctly at 1280px (desktop) and 768px (tablet) widths |
+| NFR-14 | All monetary values displayed with 2 decimal places and AED currency label |
+| NFR-15 | Form field labels and placeholders in English |
+| NFR-16 | Error messages are human-readable (no raw stack traces exposed to UI) |
+| NFR-17 | Summary screen accessible within 1 click of form submission |
+
+### 6.5 Availability & Reliability
+
+| ID | Requirement |
+|----|-------------|
+| NFR-18 | System remains functional when gold-api.com is unreachable (fallback price activated) |
+| NFR-19 | Backend uptime target: 99.5% excluding scheduled maintenance |
+| NFR-20 | `gold_history.json` must be present at startup; absence causes a clear `FileNotFoundError` |
 
 ---
 
-## 7. Acceptance Criteria per Requirement
+## 7. Acceptance Criteria Per Key Requirement
 
 | Requirement | Acceptance Criteria |
-|-------------|-------------------|
-| Gold valuation (US-001) | [ ] AED value = pure_grams × live_aed_per_gram, correct to 2 decimal places |
-| Live rates display (US-002) | [ ] Karat table updates on page load; shows AED/gram for all 5 karats |
-| Today's score (US-003) | [ ] Score 1–10 with label and guidance text displayed on load |
-| LTV calculation (US-004) | [ ] Final LTV matches formula in CALCULATIONS.md for all test cases |
-| LTV breakdown (US-005) | [ ] Each factor delta displayed; sum of deltas ≈ final LTV − base 75% |
-| Eligible amount (US-006) | [ ] Amount = gold_valuation × final_ltv, displayed in AED format |
-| Future loan amount (US-007) | [ ] Future amount uses ML-predicted end price with 3% safety buffer |
-| Emirates ID lookup (US-008) | [ ] Profile auto-populates for 3 seeded IDs; 404 for unknown IDs |
-| Loan history (US-009) | [ ] Active, closed, defaulted counts and missed EMIs displayed correctly |
-| UAE PASS enrichment (US-010) | [ ] For 3 known IDs, profile shows `uaepass_verified: true` with enriched fields |
-| User risk score (US-011) | [ ] Score 0–100 correct per risk_analyzer.py formula; label matches band |
-| Company risk score (US-012) | [ ] Company risk lower than user risk when gold trend is RISING |
-| System decision (US-013) | [ ] Pre-Approved for score ≥ 2; Manual Review for score < 2 |
-| Gold chart (US-014) | [ ] Historical (3 months) and predicted (tenure months) plotted on chart |
-| Gold trend (US-015) | [ ] RISING / STABLE / FALLING label shown; pct_change displayed |
-| Reverse calculator (US-016) | [ ] Grams = desired_loan / live_rate_per_gram for each karat |
+|-------------|---------------------|
+| FR-04 (Form submission) | Submitting with all 6 valid fields returns HTTP 200 with `LoanCalculationResponse`; submitting with an unknown Emirates ID returns HTTP 404 with descriptive `detail` message |
+| FR-05 (Gold valuation) | Valuation for 100g of 22K gold at AED 350/g = AED 32,083.33 (per CALCULATIONS.md §2 example) |
+| FR-06 (LTV + eligible amount) | LTV never exceeds 75% for any input combination |
+| FR-08 (Eligibility decision) | Customer with CIBIL 780, 0 missed EMIs, 0 active loans, Government Employee → Pre-Approved |
+| FR-14 (User risk score) | Customer with CIBIL 780 contributes 5 pts; 0 missed EMIs contributes 0 pts → minimum base score of 5 |
+| FR-15 (Company risk score) | With LTV ≤ 60% and gold RISING > 5%, company risk < 20 regardless of user risk |
+| NFR-01 (Page load) | Measured with browser DevTools Network tab on standard broadband; P95 < 3s |
+| NFR-02 (Calc response) | Measured with curl against local backend; P95 < 2s |
 
 ---
 
 ## 8. Constraints & Assumptions
 
 ### Constraints
-- Frontend hardcodes backend URL as `http://127.0.0.1:8001` — both must run on the same machine during development.
-- Customer data is dummy/seeded; no live CRM integration exists.
-- UAE PASS is stubbed; only 3 Emirates IDs return enriched profiles.
-- Gold history data is a static file — no automated refresh mechanism.
-- CORS is open (`*`) during development; must be restricted for production.
-- No authentication or authorization in current build.
+
+| # | Constraint |
+|---|-----------|
+| C-01 | LTV ceiling of 75% is a hard regulatory cap (CBUAE requirement); system must never exceed it |
+| C-02 | UAE PASS real credentials must be provisioned by the TRA before production identity enrichment can go live |
+| C-03 | `gold_history.json` is a static file; it requires periodic manual update to remain current |
+| C-04 | Customer and loan data is currently read-only (JSON files); no write operations exist in v1 |
+| C-05 | Frontend must point to `http://127.0.0.1:8001` (hardcoded); environment variable required before multi-environment deployment |
+| C-06 | The system is an internal tool; no public internet exposure until CORS and auth are hardened |
 
 ### Assumptions
-- Credit officers operate from desktop browsers (Chrome / Safari / Firefox).
-- The gold-api.com API remains free and available during business hours.
-- The `gold_history.json` file covers at least 5 years of data for meaningful ML predictions.
-- A UAE PASS production client ID and secret will be provisioned before go-live.
-- Input values (gold weight, Emirates ID) are entered by trained officers — no public-facing form.
+
+| # | Assumption |
+|---|-----------|
+| A-01 | All loan amounts and gold valuations are in AED (UAE Dirham) for operational decisions; SAR display is for reference |
+| A-02 | The AED/USD peg (3.6725) and SAR/USD peg (3.7500) are fixed and will not change |
+| A-03 | CIBIL scores are provided by the customer data system; the dashboard does not perform live CIBIL bureau lookups |
+| A-04 | Loan officers accessing the system are internal staff; no public user registration or self-service flow is required |
+| A-05 | Three seeded Emirates IDs are sufficient for demonstration and testing purposes |
+| A-06 | `gold_history.json` contains accurate and complete 20-year price data |
+| A-07 | The 75% base LTV is the maximum allowable under current CBUAE guidelines for gold-backed loans |
 
 ---
 
 ## 9. Out of Scope
 
-- Loan application origination and submission to a loan management system
-- Document upload (income proof, KYC documents, valuation certificates)
-- EMI schedule generation and payment collection
-- Notifications (SMS, email, WhatsApp) to customers
-- Multi-branch or multi-tenant configuration
-- Mobile application (iOS / Android)
-- Real-time audit logging to a database
-- Report generation / PDF export of loan assessment
-- Integration with Finance House's core banking system
-- Regulatory reporting
+The following items are explicitly excluded from this version:
+
+- Loan disbursement, repayment scheduling, or payment processing
+- Write operations to customer or loan records
+- Multi-user authentication, login screens, or role-based access control
+- Mobile-native application (iOS / Android)
+- SMS / email notifications to customers
+- Integration with Finance House's core banking system or CRM
+- Production UAE PASS OAuth2 integration (credentials not yet provisioned)
+- Automated regulatory reporting
+- Multi-language UI (Arabic)
+- Branch-level reporting or dashboards
+- Customer self-service portal
 
 ---
 
-## 10. Glossary
+## 10. Glossary of Key Terms
 
 | Term | Definition |
 |------|-----------|
-| LTV | Loan-to-Value ratio — the percentage of the gold's value that can be lent |
-| CIBIL | Credit Information Bureau India Limited score — creditworthiness indicator (300–900) |
-| Emirates ID | UAE national identity number in format `784-YYYY-XXXXXXX-X` |
-| AED | UAE Dirham — primary currency for gold valuations in this system |
-| XAU | International symbol for gold (1 XAU = 1 troy ounce) |
-| Troy ounce | Unit of mass for precious metals = 31.1035 grams |
-| UAE PASS | UAE government digital identity platform for citizen verification |
-| Gold trend | RISING / STABLE / FALLING classification from ML model's predicted % change |
-| Pre-Approved | System decision: applicant meets all criteria; proceed with documentation |
-| Manual Review | System decision: credit officer escalation required before approval |
-| Base LTV | Regulatory ceiling of 75% — maximum LTV before any adjustments |
-| Karat | Measure of gold purity: 24K = pure gold (1.000), 18K = 75% gold |
+| **LTV (Loan-to-Value)** | Percentage of the gold's assessed value that can be lent. Capped at 75% by CBUAE regulation. |
+| **CIBIL Score** | Credit Information Bureau (India) Ltd score; used here as a general creditworthiness proxy (300–900 scale). |
+| **Emirates ID** | UAE national identity number in format `784-YYYY-XXXXXXX-C`. |
+| **XAU** | ISO 4217 currency code for gold (troy ounce). |
+| **AED** | UAE Dirham. Fixed peg: 1 USD = 3.6725 AED. |
+| **SAR** | Saudi Riyal. Fixed peg: 1 USD = 3.7500 SAR. |
+| **Troy Ounce** | Unit of weight for precious metals. 1 troy oz = 31.1035 grams. |
+| **Karat** | Measure of gold purity. 24K = pure gold (100%); 18K = 75% gold. |
+| **Carat Purity** | Gold fraction: 24K=1.0, 22K=0.9167, 21K=0.875, 18K=0.75, 14K=0.5833. |
+| **Pre-Approved** | System decision: application meets eligibility criteria; proceed with standard documentation. |
+| **Manual Review** | System decision: elevated risk signals detected; senior credit officer review required. |
+| **UAE PASS** | UAE government national digital identity platform operated by the Telecommunications Regulatory Authority (TRA). |
+| **Gold Trend** | ML-predicted direction of gold price over the loan tenure: RISING / STABLE / FALLING. |
+| **User Risk Score** | Composite 0–100 score of borrower default probability (CIBIL, EMI history, active loans, profession, balance). |
+| **Company Risk Score** | Composite 0–100 score of the institution's exposure on a specific loan (borrower risk + collateral quality + gold market outlook). |
+| **Polynomial Ridge Regression** | Machine learning model fitting a degree-3 polynomial with L2 regularization to historical gold prices. |
+| **CBUAE** | Central Bank of the UAE — the regulator that sets LTV ceilings for gold-backed lending. |
+| **Seeded Data** | Dummy customer and loan records generated by `seed_data.py` for testing; not real customer data. |
