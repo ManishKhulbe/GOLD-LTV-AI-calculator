@@ -1,156 +1,137 @@
-# MODEL_PLAYBOOK.md — Model Selection Guidance
-**Project:** Gold LTV AI Calculator — Finance House Dubai
-**Version:** 1.0
-**Date:** 2026-05-01
+# Model Selection Playbook
 
 Guidance for choosing models by phase and task type.
 
-**No model is required.** These are recommendations, not requirements.
+**No specific model is required.** These are capability-based recommendations, not hard requirements.
 
 ---
 
 ## Selection by Phase
 
 ### Planning & Architecture
-
 **Recommended capabilities:**
 - Extended reasoning / thinking mode
-- Large context window (analyze multiple service files simultaneously)
-- Strong at structured output (specs, plans, API contracts)
+- Large context window (to analyze SPEC.md, BRD.md, PRD.md, FRD.md, ARCHITECTURE.md together)
+- Strong structured output (for specs, plans, roadmaps, decision tables)
 
-**Why:** Architecture decisions here affect the calculation pipeline, ML blend weights, LTV multiplier chain, and API response shape — all of which ripple across backend services and the frontend. Requires reading `main.py`, all 5 services, `models.py`, and `App.jsx` in parallel.
+**Why:** Planning for this project requires understanding the full LTV formula chain, ML pipeline, risk scoring logic, and UAE regulatory context simultaneously. Shallow analysis leads to incomplete specs that break during implementation.
 
-**Tasks in this project:**
-- Designing new LTV multiplier or risk score component
-- Planning API schema changes (new fields in `LoanCalculationResponse`)
-- Architectural decisions affecting ML pipeline or currency flow
-- Writing or revising SPEC.md, BRD.md, PRD.md, FRD.md
+**This project specifically:** When planning changes to the LTV formula or ML blend weights, load `CALCULATIONS.md` + the relevant service file together — the interaction between factors is non-obvious.
 
 ---
 
 ### Code Implementation
-
 **Recommended capabilities:**
 - Fast iteration speed
-- Good at code completion and Pydantic model generation
-- Tool/function calling (run backend, check lint output)
+- Strong code completion (Python FastAPI + React JSX)
+- Tool / function calling (for running verification commands against the API)
 
-**Why:** Most implementation tasks in this project are small and localized — add a multiplier value, rename a field, adjust a formula, update a React component. Fast feedback loops matter more than deep reasoning.
+**Why:** Implementation involves many small changes — adding a new LTV factor, adjusting a multiplier, updating the Pydantic model — with frequent verification cycles using `curl` or Swagger UI.
 
-**Tasks in this project:**
-- Adding a new karat purity value to `loan_calculator.py`
-- Updating `formatSar()` or adding a new metric chip to `App.jsx`
-- Adjusting ML noise constant or blend weight in `gold_service.py`
-- Adding a new Pydantic field to `models.py`
-
----
-
-### Debugging
-
-**Recommended capabilities:**
-- Extended reasoning (hypothesis generation from stack traces)
-- Good at reading FastAPI / Pydantic error output
-- Context for tracing values across service chain
-
-**Why:** Bugs in this system often span multiple files: a wrong gold valuation SAR value may originate in `gold_service.py`, pass through `loan_calculator.py`, and surface incorrectly in `App.jsx`. Requires tracing the full pipeline.
-
-**Tasks in this project:**
-- LTV value not matching expected calculation
-- Frontend displaying wrong currency (AED showing instead of SAR)
-- ML forecast producing downward-only predictions
-- Amortization schedule final balance not approaching 0
-- Gold API fallback not activating correctly
+**This project specifically:** After implementing any change to `loan_calculator.py`, immediately verify with `curl -X POST http://127.0.0.1:8001/loan/calculate` using a seeded Emirates ID and compare against the CALCULATIONS.md formula manually.
 
 ---
 
 ### Refactoring
-
 **Recommended capabilities:**
-- Large context window (see full `App.jsx` ~900 lines + all backend services)
-- Pattern recognition for consistent naming conventions
-- Apply `_sar` suffix renaming across multiple files
+- Large context window (to see `main.py`, `loan_calculator.py`, `models.py`, and the frontend together)
+- Pattern recognition across files
+- Consistent style application
 
-**Why:** Refactoring in this project typically touches both backend (`models.py`, service files) and frontend (`App.jsx`) simultaneously. Currency unification, field renaming, and component extraction all require cross-file consistency.
+**Why:** The LTV pipeline spans `main.py` → `loan_calculator.py` → `models.py` → frontend `App.jsx`. A refactor that changes a field name in `LTVBreakdown` must propagate through all four files consistently.
 
-**Tasks in this project:**
-- Extracting `App.jsx` into component files
-- Migrating JSON file store to PostgreSQL
-- Applying consistent field naming across all Pydantic models
-- Extracting EMI calculator into its own backend endpoint
+**This project specifically:** Before any refactor touching `LoanCalculationResponse`, search for every field name usage in `App.jsx` — the frontend destructures the full payload without type safety.
+
+---
+
+### Debugging
+**Recommended capabilities:**
+- Extended reasoning (for hypothesis generation in multi-factor scoring bugs)
+- Stack trace analysis
+- Error pattern matching
+
+**Why:** Bugs in this system are often silent — a wrong multiplier produces a plausible but incorrect LTV rather than an error. Debugging requires hypothesis testing against known expected outputs from `CALCULATIONS.md`, not just reading stack traces.
+
+**This project specifically:** For LTV calculation bugs, always compute the expected value manually from `CALCULATIONS.md` first, then compare to the API response field by field through the `ltv_breakdown` object.
 
 ---
 
 ### Code Review
-
 **Recommended capabilities:**
-- Large context (review `App.jsx` + all backend services together)
-- Financial calculation verification
-- Security pattern knowledge (input sanitisation, CORS, secrets)
+- Large context window (to review diffs alongside `CALCULATIONS.md` and `RULEBOOK.md` simultaneously)
+- Security pattern knowledge (input validation, CORS, secrets handling)
+- Formula correctness checking
 
-**Why:** Every PR must be verified against RULEBOOK.md — LTV ceiling preserved, no AED in responses, formulas unchanged, no secrets committed.
-
-**Tasks in this project:**
-- Verifying LTV multiplier chain is correct and ceiling enforced
-- Confirming no AED values introduced in API response or UI
-- Checking new Pydantic fields use `_sar` suffix
-- Reviewing ML pipeline changes for blend weight correctness
-- Auditing new endpoints for input validation and error shape
+**Why:** In this project, a code review must verify both correctness (does the code match CALCULATIONS.md?) and completeness (does the PR update CALCULATIONS.md if the formula changed?). Formula correctness cannot be inferred from code alone without the reference doc.
 
 ---
 
 ## Capability Tiers
 
-| Tier | Characteristics | Best For in This Project |
-|---|---|---|
-| **Fast** | Quick responses, low cost | Small formula tweaks, field renames, React component edits |
-| **Standard** | Balanced speed/quality | Full feature implementation, service modifications |
-| **Reasoning** | Extended thinking, slower | Architecture decisions, debugging multi-file pipeline bugs, planning ML changes |
-| **Long-context** | >100k tokens | Reviewing full `App.jsx` + all backend services simultaneously |
+| Tier | Characteristics | Best For |
+|------|-----------------|----------|
+| **Fast** | Quick responses, lower cost | Implementation, iteration, simple edits |
+| **Standard** | Balanced speed and quality | Most everyday tasks, bug fixes |
+| **Reasoning** | Extended thinking, slower | Planning, debugging multi-factor scoring bugs, architecture |
+| **Long-context** | 100k+ token window | Review, refactoring across all service files + frontend |
 
 ---
 
 ## Anti-Patterns
 
-❌ **Using reasoning models for a single field rename** — Overkill; costs time and tokens
+❌ **Using reasoning models for simple edits** — Adding a new profession factor value does not need deep reasoning; use a fast model and verify the math manually.
 
-❌ **Using fast models for ML pipeline architecture** — Insufficient depth; blend weights and model anchoring have subtle interactions
+❌ **Using fast models for architecture** — Decisions about replacing JSON data files with PostgreSQL, or restructuring the ML pipeline, require understanding the full system — insufficient context leads to incomplete plans.
 
-❌ **Reading all 5 service files before knowing which one has the bug** — Search first with grep; only read the relevant service
+❌ **Ignoring context limits when reviewing formula changes** — Loading `CALCULATIONS.md` + all 5 service files + `App.jsx` in one context is expensive but necessary for formula change reviews. Don't truncate.
 
-❌ **Mixing AED and SAR calculations across a session** — Currency confusion is the most common source of value errors in this codebase; always confirm the field suffix
+❌ **Forcing a specific model** — Breaks model-agnosticism. Capability matters; provider name doesn't.
 
-❌ **Treating `App.jsx` as one file** — It has distinct logical sections (CalculatorScreen, SummaryScreen, EMI calculator, chart, risk bars); search for the relevant section before reading the whole file
+❌ **Skipping empirical verification** — In this project especially, "the code looks right" is never sufficient for LTV, risk scoring, or ML prediction changes. Always capture a `curl` response or Swagger screenshot.
 
 ---
 
 ## Model Switching Mid-Session
 
 **When to switch:**
-- Context approaching 50% with large files loaded
-- Moving from planning (new feature spec) to implementation
-- Debugging is taking more than 3 attempts without progress
+- Context is getting polluted (approaching 50%) — especially likely when debugging ML prediction issues while also holding all service files in context
+- Task type changes significantly (e.g., planning a new risk factor → implementing it)
+- Current model is consistently producing incorrect LTV calculations in generated code (switch to reasoning mode)
 
 **How to switch:**
-1. Note the current task and which files are relevant
-2. Save progress in `docs/STATE.md` if mid-task
-3. Start fresh session with appropriate model
-4. Reference `docs/STATE.md` and `CLAUDE.md` to resume
+1. Create a state snapshot using the template in `.gsd/PROJECT_RULES.md`
+2. Update `.gsd/STATE.md` with current position, files touched, and the specific formula or endpoint being worked on
+3. Start a fresh session with the appropriate model
+4. Load `.gsd/STATE.md` first, then only the files needed for the next step
 
 ---
 
-## Project-Specific Context Load Order
+## Project-Specific Model Notes
 
-When starting a session on this project, load in this order (search first, load only what you need):
-
-1. `CLAUDE.md` — always; gives port, path, and architecture orientation
-2. `docs/RULEBOOK.md` — if touching calculations, currency, or formulas
-3. `docs/SPEC.md` — if planning or reviewing scope
-4. `backend/models.py` — if changing API shape
-5. Specific service file — only the one relevant to the task
-6. `src/App.jsx` — search for relevant component section, not full file
+| Task | Notes |
+|------|-------|
+| LTV formula validation | Load `CALCULATIONS.md` §3 + `loan_calculator.py` together; verify with manual arithmetic |
+| ML prediction debugging | Load `gold_service.py` + `CALCULATIONS.md` §5; test with known historical data points |
+| Risk score review | Load `risk_analyzer.py` + `CALCULATIONS.md` §7–8; use all 3 seeded Emirates IDs as test cases |
+| Frontend chart debugging | Need `App.jsx` (large file) + `GoldInsights` model; request a reasoning model for SVG math |
+| UAE PASS integration (future) | Load `uaepass_service.py` + the UAE PASS API docs together; reasoning model for OAuth flow |
 
 ---
 
-See `docs/PROJECT_RULES.md` for canonical project rules.
-See `docs/RULEBOOK.md` for calculation and engineering standards.
-See `CLAUDE.md` for commands and architecture orientation.
+## GSD Model-Agnostic Principle
+
+This methodology works with any capable LLM. It compensates for model differences through:
+
+1. **Structured plans** — Reduce ambiguity regardless of model; the LTV formula is explicit in `CALCULATIONS.md`
+2. **Explicit verification** — Catch errors no matter which model runs the task; `curl` output is the arbiter
+3. **State persistence** — Enable seamless model switching via `.gsd/STATE.md`
+4. **Fresh context** — Prevent context accumulation issues; the gold service pipeline is complex enough to degrade silently with accumulated context
+
+Choose models based on task needs, not methodology requirements.
+
+---
+
+_Last updated: 2026-05-08_
+
+See `.gsd/PROJECT_RULES.md` for canonical rules.  
+See `docs/RULEBOOK.md` for project-specific enforcement rules.

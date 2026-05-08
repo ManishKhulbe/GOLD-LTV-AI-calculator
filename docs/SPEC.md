@@ -1,156 +1,115 @@
 # SPEC.md — Project Specification
-**Project:** Gold LTV AI Calculator — Finance House Dubai
-**Version:** 1.0
-**Date:** 2026-05-01
-**Status:** FINALIZED
+
+**Status**: `DRAFT`
+
+⚠️ **Planning Lock**: No code may be written until this spec is marked `FINALIZED`.
 
 ---
 
 ## Vision
 
-The Gold LTV AI Calculator is a real-time web dashboard that enables Finance House Dubai credit officers to evaluate gold loan applications in under 3 minutes. It replaces a manual, spreadsheet-based process where officers spent 15–30 minutes per application looking up gold prices, computing LTV ratios, and assessing borrower risk by intuition. The system fetches live gold prices, applies a standardised 6-factor LTV model, runs ML-based price forecasting over the loan tenure, scores borrower and company risk on a 0–100 scale, and calculates repayment options — all in a single dashboard interaction with no manual arithmetic.
+The Gold Loan Valuation & Eligibility Dashboard is a real-time web application for Finance House Dubai's credit officers, designed to replace manual spreadsheet-based gold loan appraisals with an automated, auditable, formula-enforced eligibility pipeline — computing live gold valuations, multi-factor Loan-to-Value ratios, ML-powered gold price predictions, and quantified borrower risk scores to produce an instant loan decision in under 5 seconds.
 
 ---
 
 ## Goals
 
-1. **Automate gold valuation** — Fetch live XAU/USD price, convert to SAR/gram, compute pure gold content and market value from weight + carat inputs. Eliminate manual price table lookups entirely.
-
-2. **Standardise LTV decisions** — Apply a deterministic 6-factor multiplier chain (carat, SIMAH score, missed EMIs, active loans, profession, gold trend) anchored to a 75% base. Zero variance between officers assessing the same application.
-
-3. **Reduce assessment time** — Full eligibility dashboard (valuation, LTV, risk scores, forecast, EMI options) rendered from a single form submission in under 3 seconds.
-
-4. **Predict collateral risk** — ML blend of a 20-year polynomial model and 365-day linear model forecasts gold price over the loan tenure. Classifies trend as RISING / STABLE / FALLING with ≥70% directional accuracy target.
-
-5. **Score borrower and company risk** — Compute a 0–100 borrower risk score (SIMAH 40pts + missed EMIs 20pts + active loans 15pts + profession 15pts + balance ratio 10pts) and a 0–100 company exposure score. Both displayed as colour-coded horizontal fill bars.
-
-6. **Enable EMI planning** — Monthly reducing-balance EMI and bullet payment calculator with amortization schedule, embedded in the same dashboard.
+1. **Standardize LTV Calculation** — Enforce a consistent 6-factor multiplier chain (carat, gold type, tenure, CIBIL, profession, gold trend) so every officer produces the same LTV result for the same inputs, every time.
+2. **Eliminate Manual Gold Lookups** — Fetch the live XAU/USD spot price on every request and convert to AED/gram per karat automatically, removing the need for officers to check external sources.
+3. **Quantify Collateral Risk Over Time** — Use a blended polynomial + linear ML model trained on 20 years of gold price data to predict how the gold collateral value will change over the loan tenure, informing both the system decision and the officer's recommendation.
+4. **Score Borrower and Lender Risk** — Produce numerical user risk (0–100) and company risk (0–100) scores from CIBIL, EMI history, loan activity, profession stability, and gold market conditions — replacing subjective officer judgment with consistent, documented criteria.
+5. **Deliver an Auditable Decision** — Issue a clear system decision (Pre-Approved / Manual Review) with a point-scored rationale so credit risk managers can review, override, and trace every decision.
+6. **Enable Self-Service Pre-Qualification** — Provide a reverse calculator that tells officers (and customers in-branch) exactly how many grams of gold are needed per karat to secure a desired loan amount.
 
 ---
 
 ## Non-Goals (Out of Scope)
 
-- Loan origination, approval workflow, or disbursement — handled by Finance House core banking system
-- Document upload or KYC document management — requires a separate document platform
-- Real persistent database — JSON file-based data store is intentional for this phase
-- Real UAE PASS OAuth2 integration — currently stubbed; requires UAE government credentials approval
-- Mobile application — officer workflow is desktop-only
-- Arabic UI — future localisation; not required for v1
-- Automated gold history data updates — manual file refresh process for now
-- Multi-branch or multi-role access control — single-role POC
-- Loan repayment tracking — separate loan management system
-- Regulatory or compliance reporting — separate compliance tooling
+- Loan origination, application submission, or integration with the core banking system
+- Document upload (income proof, gold valuation certificates, KYC documents)
+- EMI schedule generation or repayment collection
+- Customer-facing self-service portal or mobile application
+- Real-time audit log persisted to a database
+- PDF export of the loan assessment summary
+- Multi-branch, multi-tenant, or multi-role configuration
+- SMS / email / push notifications to customers or officers
+- Automated refresh of `gold_history.json` — this is a manually maintained static file
+- Full production UAE PASS OAuth 2.0 integration (stub only in v1)
 
 ---
 
 ## Constraints
 
-**Technical**
-- Gold price data sourced exclusively from `gold-api.com` free tier — no uptime SLA; fallback constant `FALLBACK_USD_OZ = 3300.0` required
-- Historical gold price data is a static file (`backend/data/gold_history.json`) — not auto-updated; ML accuracy degrades if file is not refreshed periodically
-- UAE PASS is stubbed; real OAuth2 requires approved credentials from the UAE government
-- Frontend is a single React file (`src/App.jsx`) — no component library, no router
-- Backend must run on port 8001 — frontend hardcodes `http://127.0.0.1:8001`
-
-**Business**
-- LTV ceiling of 75% is a hard policy rule — no input combination may produce a final LTV above 75.00%
-- All monetary values must be displayed in SAR (Saudi Riyal) — no AED in UI or API responses
-- Currency peg constants are fixed: 1 USD = 3.7500 SAR; 1 troy oz = 31.1035 grams
-- Karat purity values are fixed: 24K=1.0, 22K=0.9167, 21K=0.875, 18K=0.75, 14K=0.5833
-
-**Operational**
-- Emirates IDs must be pre-seeded — no self-service customer registration in this system
-- Screen minimum: 1280px width — officer desktop workflow only
-- Target concurrent users: 50 credit officers
+- Frontend URL is hardcoded to `http://127.0.0.1:8001` — both services must run on the same machine in development.
+- Backend must start on port 8001 via `uvicorn main:app --reload --port 8001`.
+- Customer data is seeded dummy data in JSON files; no live CRM or database integration exists.
+- UAE PASS enrichment is stubbed — only 3 seeded Emirates IDs return enriched profiles.
+- No authentication or session management is implemented in v1.
+- CORS is open to all origins (`*`) in development; must be restricted before production deployment.
+- `gold_history.json` must be present at `backend/data/gold_history.json` — the server raises `FileNotFoundError` on startup if missing.
 
 ---
 
 ## Success Criteria
 
-- [ ] `POST /loan/calculate` returns full `LoanCalculationResponse` in < 3 seconds (p95)
-- [ ] Final LTV never exceeds 75.00% for any combination of inputs
-- [ ] All 6 LTV multipliers are applied and their individual delta contributions are visible in breakdown
-- [ ] Live gold rate panel loads within 1 second of page open; fallback rate shown if API is down
-- [ ] Gold price forecast chart renders 3 historical monthly averages + current live dot + N predicted monthly points
-- [ ] ML trend direction (RISING/STABLE/FALLING) matches actual historical direction ≥ 70% of backtested cases
-- [ ] User risk score (0–100) and company risk score (0–100) returned for every application
-- [ ] Monthly EMI formula (`P × r(1+r)^n / ((1+r)^n - 1)`) produces correct results to 2 decimal places
-- [ ] Bullet payment formula (`P × (1 + rate × months/12)`) produces correct results to 2 decimal places
-- [ ] Amortization table interest column decreases monotonically; final balance rounds to ≈ 0
-- [ ] Future-adjusted loan estimate equals `future_gold_valuation × ltv × 0.97`; delta % shown
-- [ ] No AED values appear anywhere in the UI or API responses
-- [ ] System remains functional when gold-api.com is unreachable (uses fallback rate transparently)
-- [ ] UAE PASS failure produces no user-visible error; local DB profile used silently
-- [ ] Emirates ID format validated before submission (`784-\d{4}-\d{7}-\d`); 422 returned on invalid input
+- [ ] `POST /loan/calculate` with any of the 3 seeded Emirates IDs returns a complete `LoanCalculationResponse` in under 5 seconds
+- [ ] Computed `final_ltv_pct` matches manual calculation per CALCULATIONS.md formula to within ±0.1%
+- [ ] Gold trend is classified RISING when predicted % change exceeds +2%, FALLING when below −2%, else STABLE
+- [ ] User risk score is lower than company risk score when gold trend is RISING and LTV is below 60%
+- [ ] System decision is Pre-Approved for customers with CIBIL ≥ 750, 0 missed EMIs, and RISING gold trend
+- [ ] Live gold rates display on calculator screen within 3 seconds of page load
+- [ ] Reverse calculator shows correct grams for all 5 karats given any positive AED loan amount
+- [ ] Fallback gold price (`FALLBACK_USD_OZ = 3300.0`) keeps the system functional when gold-api.com is unreachable
 
 ---
 
 ## User Stories
 
-### As a credit officer
-I want to see live SAR gold prices per karat (14K–24K) when I open the calculator
-So that I can confirm today's market rate before processing an application.
+### As a Credit Officer
+- I want to enter a customer's Emirates ID, carat, gold type, weight, tenure, and profession once
+- So that I get a complete eligibility dashboard in under 5 seconds without opening any other system
 
-### As a credit officer
-I want the system to calculate gold valuation automatically from weight and carat
-So that I don't have to look up purity tables or do manual arithmetic.
+### As a Credit Officer
+- I want to see live gold prices per gram for all karats (24K to 14K) on the calculator screen
+- So that I can quote accurate rates to the customer before starting the assessment
 
-### As a credit officer
-I want to see a standardised LTV percentage with a breakdown of every adjustment factor
-So that I can explain the figure to the borrower and satisfy my credit manager.
+### As a Credit Officer
+- I want to see a 1–10 "today's loan score" with guidance text when I open the tool
+- So that I can proactively advise customers on whether now is a good time to take a gold loan
 
-### As a credit officer
-I want to see the maximum SAR loan amount the borrower is eligible for
-So that I can immediately communicate the lending limit.
+### As a Credit Risk Manager
+- I want to see an LTV breakdown showing each factor's contribution
+- So that I can verify compliance with the approved multiplier policy in any escalated case
 
-### As a credit officer
-I want a 0–100 borrower risk score displayed as a colour-coded bar
-So that I can instantly assess repayment probability without reading through raw credit data.
+### As a Credit Risk Manager
+- I want to see quantified user and company risk scores (0–100) with labeled bands
+- So that I can make consistent, defensible decisions when reviewing Manual Review cases
 
-### As a credit officer
-I want to see Finance House's company exposure score if this loan defaults
-So that I can make a fully-informed approval recommendation.
-
-### As a credit officer
-I want to see a gold price forecast chart covering the full loan tenure
-So that I can assess whether the collateral value is likely to hold or decline.
-
-### As a credit officer
-I want to toggle between monthly EMI and bullet payment modes and enter a rate
-So that I can present the right repayment option to the borrower in the same session.
-
-### As a credit officer
-I want a scrollable month-by-month amortization table when monthly EMI is selected
-So that I can walk the borrower through exactly what they pay each month.
-
-### As a credit manager
-I want every LTV multiplier contribution to be visible in the breakdown panel
-So that I can audit any loan decision and confirm it follows company policy.
+### As a Customer (via officer)
+- I want to know how many grams of gold I need to bring to secure a specific loan amount
+- So that I can prepare the right amount of gold before visiting the branch
 
 ---
 
 ## Technical Requirements
 
 | Requirement | Priority | Notes |
-|---|---|---|
-| Live XAU/USD → SAR/gram price fetch on every calculator page load | Must-have | `GET /api/gold-rate/live`; fallback to 3300 USD/oz on failure |
-| Gold valuation: `pure_grams × live_sar_per_gram` | Must-have | Purity constants fixed; result rounded to 2dp |
-| 6-factor LTV multiplier chain with hard 75% ceiling | Must-have | `min(computed_ltv, 0.75)` enforced in `loan_calculator.py` |
-| Eligible loan amount: `valuation_sar × final_ltv` | Must-have | Displayed in hero card; SAR formatted |
-| ML forecast: 65% polynomial (20yr) + 35% linear (365-day) blend | Must-have | Anchored to live price at day-0; noise `0.6% × sqrt(month)` |
-| User risk score (5 components, 0–100) | Must-have | SIMAH 40 + missed EMIs 20 + active loans 15 + profession 15 + balance ratio 10 |
-| Company risk score (`user×0.40 + ltv_risk + market_risk`, 0–100) | Must-have | Rising gold reduces company risk |
-| Monthly EMI: reducing balance formula | Must-have | `P × r(1+r)^n / ((1+r)^n-1)`; zero-rate case: `P/n` |
-| Bullet payment: simple interest formula | Must-have | `P × (1 + rate × months/12)` |
-| Amortization schedule: month-by-month table | Should-have | Scrollable 220px; sticky header; principal green, interest red |
-| Future-adjusted loan estimate with 3% safety buffer | Should-have | `future_valuation × ltv × 0.97`; delta % shown |
-| Gold price forecast chart (SVG polyline) | Should-have | 3 history pts + current dot + N predicted pts per tenure |
-| Customer profile + loan history display | Should-have | From `dummy_customers.json` + `dummy_loans.json` |
-| UAE PASS identity enrichment (stub) | Could-have | Silent fallback to local DB on any failure |
-| Pydantic v2 input validation on all request fields | Must-have | Emirates ID regex; numeric range checks; 422 on failure |
-| CORS restricted to Finance House domain in production | Must-have | Dev: `*`; Production: domain-locked |
-| All amounts in SAR; no AED in API responses or UI | Must-have | `_sar` field suffix convention throughout |
+|-------------|----------|-------|
+| FastAPI backend on port 8001 | Must-have | `uvicorn main:app --reload --port 8001` |
+| React 19 + Vite frontend on port 5173 | Must-have | `npm run dev` |
+| Pydantic v2 request/response validation | Must-have | Enforces all field types and constraints |
+| Live XAU/USD → AED/gram conversion | Must-have | Fallback to 3300.0 USD/oz if API unavailable |
+| 6-factor LTV multiplier chain | Must-have | Exactly as specified in CALCULATIONS.md §3 |
+| ML gold price prediction (blended model) | Must-have | 65% polynomial + 35% linear; anchored to live price |
+| 20-year `gold_history.json` at startup | Must-have | `FileNotFoundError` raised if missing |
+| User risk score 0–100 | Must-have | Per CALCULATIONS.md §7 |
+| Company risk score 0–100 | Must-have | Per CALCULATIONS.md §8 |
+| UAE PASS enrichment stub | Should-have | Hardcoded for 3 Emirates IDs; production path documented |
+| CORS open (`*`) for development | Should-have | Must be restricted before production |
+| scikit-learn Ridge regression | Should-have | NumPy polyfit fallback if sklearn unavailable |
+| Reverse calculator (grams per karat) | Should-have | `grams = desired_amount / live_rate[karat]` |
+| Today's gold loan score (1–10) | Should-have | Derived from 12-month ML prediction |
 
 ---
 
-*Last updated: 2026-05-01*
+_Last updated: 2026-05-08_
