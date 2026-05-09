@@ -8,7 +8,7 @@ const initialForm = {
   jobProfession: '',
 }
 
-const BACKEND_BASE_URL = 'http://127.0.0.1:8001'
+const BACKEND_BASE_URL = import.meta?.env?.VITE_BACKEND_BASE_URL || 'http://127.0.0.1:8001'
 
 const formatAed = (value) =>
   value != null ? `AED ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
