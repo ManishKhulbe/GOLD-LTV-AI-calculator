@@ -10,7 +10,7 @@ const initialForm = {
   jobProfession: '',
 }
 
-const BACKEND_BASE_URL = 'http://127.0.0.1:8001'
+const BACKEND_BASE_URL = import.meta?.env?.VITE_BACKEND_BASE_URL || 'http://127.0.0.1:8001'
 
 const formatAed = (value) =>
   value != null ? `AED ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
@@ -39,9 +39,11 @@ function App() {
   }
 
   const submitValuation = async (formData) => {
+    const requestId = (globalThis.crypto?.randomUUID?.() || `req_${Date.now()}_${Math.random().toString(16).slice(2)}`)
+
     const response = await fetch(`${BACKEND_BASE_URL}/loan/calculate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-request-id': requestId },
       body: JSON.stringify({
         emirates_id: formData.emiratesId,
         carat: formData.carat,
@@ -54,7 +56,8 @@ function App() {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}))
-      throw new Error(err.detail || 'Failed to calculate valuation.')
+      const detail = err.detail || err.message || 'Loan calculation failed.'
+      throw new Error(`${detail} Ref: ${requestId}`)
     }
 
     return response.json()
