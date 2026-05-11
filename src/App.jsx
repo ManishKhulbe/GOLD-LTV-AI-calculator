@@ -10,10 +10,34 @@ const initialForm = {
   jobProfession: '',
 }
 
-const BACKEND_BASE_URL = 'http://127.0.0.1:8001'
+const APP_CONFIG = {
+  backendBaseUrl: (import.meta?.env?.VITE_BACKEND_BASE_URL ?? 'http://127.0.0.1:8001').replace(/\/$/, ''),
+}
+
+const BACKEND_BASE_URL = APP_CONFIG.backendBaseUrl
+
+const FETCH_TIMEOUT_MS = 8000
 
 const formatAed = (value) =>
   value != null ? `AED ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+
+const LOG_FILE = '/GOLD-LTV-AI-calculator/src/App.jsx'
+
+const safeJsonStringify = (payload) => {
+  try {
+    return JSON.stringify(payload)
+  } catch {
+    return JSON.stringify({ msg: 'unserializable_log_payload' })
+  }
+}
+
+const logInfo = (message, context = {}) => {
+  console.info(`${LOG_FILE}: ${message} ${safeJsonStringify(context)}`)
+}
+
+const logError = (message, context = {}) => {
+  console.error(`${LOG_FILE}: ${message} ${safeJsonStringify(context)}`)
+}
 
 const HEADER_TABS = ['Wealth Management', 'Gold Loans', 'Treasury', 'Institutional']
 
@@ -39,38 +63,120 @@ function App() {
   }
 
   const submitValuation = async (formData) => {
-    const response = await fetch(`${BACKEND_BASE_URL}/loan/calculate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        emirates_id: formData.emiratesId,
-        carat: formData.carat,
-        gold_type: formData.goldType,
-        gold_weight_grams: parseFloat(formData.goldWeight),
-        tenure_months: parseInt(formData.loanTenure, 10),
-        job_profession: formData.jobProfession,
-      }),
+    const requestId = globalThis.crypto?.randomUUID?.() ?? `req_${Date.now()}_${Math.random().toString(16).slice(2)}`
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+    const maskedEid = typeof formData.emiratesId === 'string' && formData.emiratesId.length >= 4
+      ? `***${formData.emiratesId.slice(-4)}`
+      : '***'
+
+    logInfo('[tomo-id-001] submitValuation.start', {
+      request_id: requestId,
+      operation: 'loan.calculate',
+      emirates_id_masked: maskedEid,
     })
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(err.detail || 'Failed to calculate valuation.')
-    }
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/loan/calculate`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-request-id': requestId,
+          ...(typeof window !== 'undefined' && window?.__traceparent ? { traceparent: window.__traceparent } : {}),
+        },
+        body: JSON.stringify({
+          emirates_id: formData.emiratesId,
+          carat: formData.carat,
+          gold_type: formData.goldType,
+          gold_weight_grams: parseFloat(formData.goldWeight),
+          tenure_months: parseInt(formData.loanTenure, 10),
+          job_profession: formData.jobProfession,
+        }),
+      })
 
-    return response.json()
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        const detail = typeof err?.detail === 'string' && err.detail.trim().length > 0
+          ? err.detail
+          : 'Loan valuation request was rejected by the backend.'
+
+        logError('[tomo-id-002] submitValuation.http_error', {
+          request_id: requestId,
+          operation: 'loan.calculate',
+          status: response.status,
+          action: 'Verify backend availability and request payload fields; retry after correcting inputs.',
+        })
+
+        throw new Error(`${detail} Ref: ${requestId}`)
+      }
+
+      const payload = await response.json()
+
+      logInfo('[tomo-id-003] submitValuation.success', {
+        request_id: requestId,
+        operation: 'loan.calculate',
+      })
+
+      return payload
+    } catch (error) {
+      const isAbort = error instanceof DOMException && error.name === 'AbortError'
+
+      logError('[tomo-id-004] submitValuation.exception', {
+        request_id: requestId,
+        operation: 'loan.calculate',
+        error_name: error?.name,
+        error_message: error?.message,
+        timeout_ms: FETCH_TIMEOUT_MS,
+        action: isAbort ? 'Request timed out; check backend latency and network, then retry.' : 'Check console logs with request_id and backend logs for the same x-request-id.',
+      })
+
+      throw new Error(
+        isAbort
+          ? `Valuation timed out after ${Math.round(FETCH_TIMEOUT_MS / 1000)}s. Action: check network/backend and retry. Ref: ${requestId}`
+          : `${error?.message || 'Valuation failed.'} Ref: ${requestId}`
+      )
+    } finally {
+      clearTimeout(timeoutId)
+    }
   }
 
   const handleCalculate = async (event) => {
     event.preventDefault()
+
+    if (isSubmitting) {
+      logInfo('[tomo-id-005] handleCalculate.duplicate_submit_blocked', {
+        operation: 'loan.calculate',
+        action: 'User attempted to submit while a request is already in-flight.',
+      })
+      return
+    }
+
     setIsSubmitting(true)
     setStatusMessage('Calculating gold loan value...')
+
+    logInfo('[tomo-id-006] handleCalculate.start', {
+      operation: 'loan.calculate',
+    })
 
     try {
       const result = await submitValuation(form)
       setValuationResult(result)
       setStatusMessage('Valuation calculated successfully.')
       setActiveScreen('summary')
+
+      logInfo('[tomo-id-007] handleCalculate.success', {
+        operation: 'loan.calculate',
+      })
     } catch (error) {
+      logError('[tomo-id-008] handleCalculate.failed', {
+        operation: 'loan.calculate',
+        error_name: error?.name,
+        error_message: error?.message,
+        action: 'Show user a reference ID and check backend logs using x-request-id.',
+      })
+
       setStatusMessage(`${error.message}`)
     } finally {
       setIsSubmitting(false)
@@ -80,25 +186,83 @@ function App() {
   useEffect(() => {
     const fetchLiveGoldRate = async () => {
       setIsRateLoading(true)
+
+      const requestId = globalThis.crypto?.randomUUID?.() ?? `req_${Date.now()}_${Math.random().toString(16).slice(2)}`
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+      logInfo('[tomo-id-009] fetchLiveGoldRate.start', {
+        request_id: requestId,
+        operation: 'gold_rate_and_score.refresh',
+      })
+
       try {
+        const commonOptions = {
+          signal: controller.signal,
+          headers: {
+            'x-request-id': requestId,
+            ...(typeof window !== 'undefined' && window?.__traceparent ? { traceparent: window.__traceparent } : {}),
+          },
+        }
+
         const [liveRateResponse, scoreResponse] = await Promise.all([
-          fetch(`${BACKEND_BASE_URL}/api/gold-rate/live`),
-          fetch(`${BACKEND_BASE_URL}/api/gold-loan-score/today`),
+          fetch(`${BACKEND_BASE_URL}/api/gold-rate/live`, commonOptions),
+          fetch(`${BACKEND_BASE_URL}/api/gold-loan-score/today`, commonOptions),
         ])
-        if (!liveRateResponse.ok) throw new Error('Failed to fetch live gold rate.')
-        if (!scoreResponse.ok) throw new Error('Failed to fetch today loan score.')
+
+        if (!liveRateResponse.ok) {
+          logError('[tomo-id-010] fetchLiveGoldRate.live_rate_http_error', {
+            request_id: requestId,
+            operation: 'gold_rate.live',
+            status: liveRateResponse.status,
+            action: 'Check backend /api/gold-rate/live availability and latency.',
+          })
+          throw new Error(`Live gold rate unavailable. Action: retry shortly. Ref: ${requestId}`)
+        }
+
+        if (!scoreResponse.ok) {
+          logError('[tomo-id-011] fetchLiveGoldRate.score_http_error', {
+            request_id: requestId,
+            operation: 'gold_loan_score.today',
+            status: scoreResponse.status,
+            action: 'Check backend /api/gold-loan-score/today availability and latency.',
+          })
+          throw new Error(`Today's loan score unavailable. Action: retry shortly. Ref: ${requestId}`)
+        }
 
         const [rateData, scoreData] = await Promise.all([
           liveRateResponse.json(),
           scoreResponse.json(),
         ])
+
         setLiveGoldRates(rateData.karats ?? {})
         setLiveGoldCurrency(rateData.currency ?? 'AED')
         setLiveGoldUnit(rateData.unit ?? 'g')
         setTodayLoanScore(scoreData)
+
+        logInfo('[tomo-id-012] fetchLiveGoldRate.success', {
+          request_id: requestId,
+          operation: 'gold_rate_and_score.refresh',
+        })
       } catch (error) {
-        setStatusMessage(error.message)
+        const isAbort = error instanceof DOMException && error.name === 'AbortError'
+
+        logError('[tomo-id-013] fetchLiveGoldRate.exception', {
+          request_id: requestId,
+          operation: 'gold_rate_and_score.refresh',
+          error_name: error?.name,
+          error_message: error?.message,
+          timeout_ms: FETCH_TIMEOUT_MS,
+          action: isAbort ? 'Timeout; check backend latency/network and retry.' : 'Check console logs with request_id and backend logs using x-request-id.',
+        })
+
+        setStatusMessage(
+          isAbort
+            ? `Live rates timed out after ${Math.round(FETCH_TIMEOUT_MS / 1000)}s. Action: retry. Ref: ${requestId}`
+            : (error?.message ?? `Failed to refresh live rates. Ref: ${requestId}`)
+        )
       } finally {
+        clearTimeout(timeoutId)
         setIsRateLoading(false)
       }
     }
