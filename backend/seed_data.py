@@ -7,7 +7,7 @@ Run once to generate dummy_customers.json and dummy_loans.json in the data/ dire
 
 import json, random, uuid
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -170,10 +170,16 @@ for i, eid in enumerate(EMIRATES_IDS):
     json.dumps(loans_db, indent=2, ensure_ascii=False)
 )
 
-print(f"✅  Generated {len(customers)} customers and their loan histories.")
-print(f"    Files written to  {DATA_DIR.resolve()}/")
-print()
-print("Sample Emirates IDs you can test with:")
+import logging
+
+logging.basicConfig(level=logging.INFO)
+_logger = logging.getLogger("seed-data")
+
+_logger.info(f"[tomo-id-012] seed.generated customers={len(customers)}")
+_logger.info(f"[tomo-id-013] seed.files_written path={DATA_DIR.resolve()}")
+_logger.info(f"[tomo-id-014] seed.sample_ids count=5")
 for eid in EMIRATES_IDS[:5]:
     c = customers[eid]
-    print(f"  {eid}  →  {c['customer_name']}  CIBIL={c['cibil_score']}  Risk={c['risk_category']}")
+    _logger.info(
+        f"[tomo-id-015] seed.sample_id emirates_id={eid} customer_name={c['customer_name']} cibil={c['cibil_score']} risk={c['risk_category']}"
+    )
