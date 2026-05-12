@@ -19,7 +19,6 @@ class TenureMonths(int, Enum):
     M18 = 18
     M24 = 24
     M36 = 36
-    M48 = 48
 
 
 class JobProfession(str, Enum):
@@ -29,12 +28,6 @@ class JobProfession(str, Enum):
     SELF_EMPLOYED = "Self Employed"
     RETIRED      = "Retired"
     FREELANCER   = "Freelancer"
-
-
-class GoldType(str, Enum):
-    COIN = "Coin"
-    JEWELLERY = "Jewellery"
-    STONE_JEWELLERY = "Stone Jewellery"
 
 
 class LoanStatus(str, Enum):
@@ -57,7 +50,6 @@ class RiskCategory(str, Enum):
 class LoanCalculationRequest(BaseModel):
     emirates_id: str = Field(..., example="784-1985-1234567-1")
     carat: CaratType
-    gold_type: GoldType = Field(..., example="Jewellery")
     gold_weight_grams: float = Field(..., gt=0, example=1577.19)
     tenure_months: TenureMonths
     job_profession: JobProfession
@@ -82,7 +74,7 @@ class CustomerProfile(BaseModel):
     customer_type: str           # "Existing" | "New"
     risk_category: RiskCategory
     cibil_score: int
-    # UAE PASS enriched fields (optional – populated when UAE PASS returns data)
+    # UAE PASS live identity fields (populated when UAEPASS_ACCESS_TOKEN is set)
     gender: Optional[str] = None
     email: Optional[str] = None
     full_name_ar: Optional[str] = None
@@ -105,12 +97,11 @@ class GoldPricePoint(BaseModel):
 
 
 class GoldInsights(BaseModel):
-    live_price_aed_per_gram: float            # AED/gram — used for both calc and display
-    historical_prices: List[GoldPricePoint]   # last 3 months, AED/gram
-    predicted_prices: List[GoldPricePoint]    # next tenure months, AED/gram
+    live_price_aed_per_gram: float
+    historical_prices: List[GoldPricePoint]   # last 6 months
+    predicted_prices: List[GoldPricePoint]    # next tenure months
     predicted_change_pct: float               # % change over tenure
     trend: str                                # "RISING" | "FALLING" | "STABLE"
-    predicted_end_price_aed_per_gram: float   # AED/gram at tenure end — for future loan calc
 
 
 class RiskInsights(BaseModel):
@@ -124,8 +115,6 @@ class RiskInsights(BaseModel):
 class LTVBreakdown(BaseModel):
     base_ltv_pct: float
     carat_adjustment_pct: float
-    gold_type_adjustment_pct: float
-    tenure_adjustment_pct: float
     cibil_adjustment_pct: float
     active_loans_adjustment_pct: float
     profession_adjustment_pct: float
@@ -139,13 +128,8 @@ class LoanCalculationResponse(BaseModel):
     # Hero section
     system_decision: str              # "Pre-Approved" | "Manual Review" | "Rejected"
     recommended_ltv_pct: float
-    bullet_recommended_ltv_pct: float
     gold_valuation_aed: float
     eligible_loan_amount_aed: float
-    bullet_eligible_loan_amount_aed: float
-    future_gold_valuation_aed: float
-    future_eligible_loan_amount_aed: float
-    bullet_future_eligible_loan_amount_aed: float
     suggested_tenure_months: int
     cibil_score: int
     cibil_label: str
@@ -166,25 +150,16 @@ class LoanCalculationResponse(BaseModel):
     # Risk
     risk_insights: RiskInsights
 
-    # Live karat rates (AED)
-    live_gold_currency: str = "AED"
-    live_gold_rates: dict = {}        # { "24K": float, "22K": float, ... }
+    # Live market snapshot (aligned with /api/gold-rate/live)
+    live_gold_currency: str
+    live_gold_rates: dict[str, float]
 
 
 # ── Lightweight gold-price response ───────────────────────────────────────────
 
 class LiveGoldPriceResponse(BaseModel):
-    currency: str = "AED"
+    currency: str
     rate_24k_per_gram: float
-    karats: dict                  # { "24K": float, "22K": float, ... }
+    karats: dict[str, float]
     price_usd_per_oz: float
     updated_at: str
-
-
-class TodayGoldLoanScoreResponse(BaseModel):
-    score: float
-    label: str
-    market_condition: str
-    guidance: str
-    tone: str
-    predicted_change_pct: float
