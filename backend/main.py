@@ -9,13 +9,40 @@ Docs:
 """
 
 import sys
+import json
+import logging
+import time
+import uuid
+from contextvars import ContextVar
 from pathlib import Path
 
 # Make sure sibling packages resolve correctly
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+_request_id_ctx: ContextVar[str] = ContextVar("request_id", default="")
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "request_id": _request_id_ctx.get() or None,
+        }
+        if record.exc_info:
+            payload["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+logger = logging.getLogger("gold-loan-api")
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(JsonFormatter())
+    logger.addHandler(_handler)
+logger.setLevel(logging.INFO)
 
 from models import (
     LoanCalculationRequest,
@@ -54,6 +81,22 @@ app = FastAPI(
     version="1.0.0",
 )
 
+@app.middleware("http")
+async def request_context_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or request.headers.get("x-correlation-id") or str(uuid.uuid4())
+    token = _request_id_ctx.set(request_id)
+    start = time.perf_counter()
+    logger.info(f"[tomo-id-007] request.start")
+    try:
+        response = await call_next(request)
+    finally:
+        duration_ms = (time.perf_counter() - start) * 1000.0
+        logger.info(f"[tomo-id-008] request.end duration_ms={duration_ms:.2f} method={request.method} path={request.url.path}")
+        _request_id_ctx.reset(token)
+
+    response.headers["x-request-id"] = request_id
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],   # tighten in production
@@ -65,12 +108,55 @@ app.add_middleware(
 
 # ── Health ─────────────────────────────────────────────────────────────────────
 
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
+
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+)
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["method", "path"],
+)
+
+@app.middleware("http")
+async def prometheus_middleware(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_s = time.perf_counter() - start
+    REQUEST_LATENCY.labels(request.method, request.url.path).observe(duration_s)
+    REQUEST_COUNT.labels(request.method, request.url.path, str(response.status_code)).inc()
+    return response
+
+@app.get("/metrics", tags=["System"], include_in_schema=False)
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 @app.get("/health", tags=["System"])
 async def health():
     return {"status": "ok", "service": "Finance House Dubai Gold Loan API"}
 
 
 # ── Gold price ─────────────────────────────────────────────────────────────────
+
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    ref_id = _request_id_ctx.get() or str(uuid.uuid4())
+    logger.error(f"[tomo-id-011] unhandled_exception path={request.url.path} ref_id={ref_id}", exc_info=exc)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": "ERR_INTERNAL",
+            "message": "Unexpected server error while processing request.",
+            "action": "Retry later. If the issue persists, contact support with the reference id.",
+            "ref_id": ref_id,
+        },
+    )
 
 @app.get(
     "/gold/price",
@@ -179,7 +265,7 @@ async def today_gold_loan_score():
     guidance text for frontline officers.
     """
     insights = await build_gold_insights(12)
-    print(insights.predicted_change_pct, 'predicted_change_pct')
+    logger.info(f"[tomo-id-010] gold_loan_score.prediction predicted_change_pct={float(insights.predicted_change_pct):.4f}")
     return _build_today_gold_loan_score(insights.predicted_change_pct)
 
 
@@ -242,7 +328,7 @@ async def gold_insights(
     tags=["Loan"],
     summary="Calculate LTV, loan eligibility, and risk for a gold loan application",
 )
-async def calculate_loan(req: LoanCalculationRequest):
+async def calculate_loan(req: LoanCalculationRequest, request: Request):
     """
     Full pipeline:
     1. Fetch customer profile & loan history from Emirates ID
@@ -253,6 +339,29 @@ async def calculate_loan(req: LoanCalculationRequest):
     6. Compute user & company risk scores
     7. Return a complete eligibility dashboard payload
     """
+
+    # Simple in-memory rate limit (best-effort). For multi-instance prod, replace with Redis.
+    client_ip = (request.client.host if request.client else "unknown")
+    now = time.time()
+    window_s = 60
+    max_requests = 30
+
+    if not hasattr(app.state, "rate_limit"):
+        app.state.rate_limit = {}
+
+    bucket = app.state.rate_limit.get(client_ip, [])
+    bucket = [ts for ts in bucket if (now - ts) <= window_s]
+    if len(bucket) >= max_requests:
+        logger.warning(f"[tomo-id-009] rate_limit.exceeded ip={client_ip} window_s={window_s} max_requests={max_requests}")
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Rate limit exceeded for loan calculation. "
+                "Action: slow down requests and retry after 60s."
+            ),
+        )
+    bucket.append(now)
+    app.state.rate_limit[client_ip] = bucket
 
     # ── 1. Customer data ──────────────────────────────────────────────────────
     customer = get_customer_profile(req.emirates_id)
