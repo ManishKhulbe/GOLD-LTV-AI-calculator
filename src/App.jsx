@@ -10,12 +10,162 @@ const initialForm = {
   jobProfession: '',
 }
 
-const BACKEND_BASE_URL = 'http://127.0.0.1:8001'
+const BACKEND_BASE_URL = import.meta?.env?.VITE_BACKEND_BASE_URL || 'http://127.0.0.1:8001'
 
 const formatAed = (value) =>
   value != null ? `AED ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
 
+const redactForLogs = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj
+  const clone = { ...obj }
+  if (clone.emirates_id) clone.emirates_id = String(clone.emirates_id).slice(0, 3) + '***'
+  if (clone.email) clone.email = '***'
+  if (clone.mobile) clone.mobile = '***'
+  return clone
+}
+
+const redactForLogs = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj
+  const clone = { ...obj }
+  if (clone.emirates_id) clone.emirates_id = String(clone.emirates_id).slice(0, 3) + '***'
+  if (clone.email) clone.email = '***'
+  if (clone.mobile) clone.mobile = '***'
+  return clone
+}
+
 const HEADER_TABS = ['Wealth Management', 'Gold Loans', 'Treasury', 'Institutional']
+
+const REQUEST_TIMEOUT_MS = 8000
+
+const createRequestId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const safeJson = async (response) => {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  const requestId = options.requestId ?? createRequestId()
+  const headers = {
+    ...(options.headers ?? {}),
+    'x-request-id': requestId,
+    ...(options.traceparent ? { traceparent: options.traceparent } : {}),
+  }
+
+  try {
+    console.info("GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-001] outbound_request_start", {
+      request_id: requestId,
+      url,
+      method: options.method ?? 'GET',
+      timeout_ms: timeoutMs,
+    })
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    })
+
+    console.info("GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-002] outbound_request_end", {
+      request_id: requestId,
+      url,
+      method: options.method ?? 'GET',
+      status: response.status,
+      ok: response.ok,
+    })
+
+    return { response, requestId }
+  } catch (error) {
+    const isAbort = error?.name === 'AbortError'
+    console.error("GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-003] outbound_request_failed", {
+      request_id: requestId,
+      url,
+      method: options.method ?? 'GET',
+      error_name: error?.name,
+      error_message: error?.message,
+      is_timeout: isAbort,
+      action: isAbort ? 'Retry after a few seconds; if persistent, check backend availability.' : 'Check network connectivity and backend logs.',
+    })
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+const REQUEST_TIMEOUT_MS = 8000
+
+const createRequestId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const safeJson = async (response) => {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  const requestId = options.requestId ?? createRequestId()
+  const headers = {
+    ...(options.headers ?? {}),
+    'x-request-id': requestId,
+    ...(options.traceparent ? { traceparent: options.traceparent } : {}),
+  }
+
+  try {
+    console.info("GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-001] outbound_request_start", {
+      request_id: requestId,
+      url,
+      method: options.method ?? 'GET',
+      timeout_ms: timeoutMs,
+    })
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    })
+
+    console.info("GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-002] outbound_request_end", {
+      request_id: requestId,
+      url,
+      method: options.method ?? 'GET',
+      status: response.status,
+      ok: response.ok,
+    })
+
+    return { response, requestId }
+  } catch (error) {
+    const isAbort = error?.name === 'AbortError'
+    console.error("GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-003] outbound_request_failed", {
+      request_id: requestId,
+      url,
+      method: options.method ?? 'GET',
+      error_name: error?.name,
+      error_message: error?.message,
+      is_timeout: isAbort,
+      action: isAbort ? 'Retry after a few seconds; if persistent, check backend availability.' : 'Check network connectivity and backend logs.',
+    })
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
 
 function App() {
   const [form, setForm] = useState(initialForm)
@@ -39,22 +189,28 @@ function App() {
   }
 
   const submitValuation = async (formData) => {
-    const response = await fetch(`${BACKEND_BASE_URL}/loan/calculate`, {
+    const payload = {
+      emirates_id: formData.emiratesId,
+      carat: formData.carat,
+      gold_type: formData.goldType,
+      gold_weight_grams: parseFloat(formData.goldWeight),
+      tenure_months: parseInt(formData.loanTenure, 10),
+      job_profession: formData.jobProfession,
+    }
+
+    const { response, requestId } = await fetchWithTimeout(`${BACKEND_BASE_URL}/loan/calculate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        emirates_id: formData.emiratesId,
-        carat: formData.carat,
-        gold_type: formData.goldType,
-        gold_weight_grams: parseFloat(formData.goldWeight),
-        tenure_months: parseInt(formData.loanTenure, 10),
-        job_profession: formData.jobProfession,
-      }),
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(err.detail || 'Failed to calculate valuation.')
+      const err = await safeJson(response)
+      const detail = err?.detail
+      throw new Error(
+        `${detail ?? 'Gold loan valuation request failed.'} ` +
+        `Ref: ${requestId}. Action: verify backend service is reachable and retry; if persistent, share Ref with support.`
+      )
     }
 
     return response.json()
@@ -71,6 +227,12 @@ function App() {
       setStatusMessage('Valuation calculated successfully.')
       setActiveScreen('summary')
     } catch (error) {
+      console.error("GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-004] valuation_submit_failed", {
+        operation: 'submitValuation',
+        error_name: error?.name,
+        error_message: error?.message,
+        action: 'Retry once; if it persists, capture Ref from message and check backend logs for x-request-id.',
+      })
       setStatusMessage(`${error.message}`)
     } finally {
       setIsSubmitting(false)
@@ -81,22 +243,34 @@ function App() {
     const fetchLiveGoldRate = async () => {
       setIsRateLoading(true)
       try {
-        const [liveRateResponse, scoreResponse] = await Promise.all([
-          fetch(`${BACKEND_BASE_URL}/api/gold-rate/live`),
-          fetch(`${BACKEND_BASE_URL}/api/gold-loan-score/today`),
+        const requestId = createRequestId()
+        const [liveRateResult, scoreResult] = await Promise.all([
+          fetchWithTimeout(`${BACKEND_BASE_URL}/api/gold-rate/live`, { requestId }),
+          fetchWithTimeout(`${BACKEND_BASE_URL}/api/gold-loan-score/today`, { requestId }),
         ])
-        if (!liveRateResponse.ok) throw new Error('Failed to fetch live gold rate.')
-        if (!scoreResponse.ok) throw new Error('Failed to fetch today loan score.')
+
+        if (!liveRateResult.response.ok) {
+          throw new Error(`Live gold rate fetch failed (HTTP ${liveRateResult.response.status}). Ref: ${liveRateResult.requestId}. Action: check backend /api/gold-rate/live.`)
+        }
+        if (!scoreResult.response.ok) {
+          throw new Error(`Today loan score fetch failed (HTTP ${scoreResult.response.status}). Ref: ${scoreResult.requestId}. Action: check backend /api/gold-loan-score/today.`)
+        }
 
         const [rateData, scoreData] = await Promise.all([
-          liveRateResponse.json(),
-          scoreResponse.json(),
+          liveRateResult.response.json(),
+          scoreResult.response.json(),
         ])
         setLiveGoldRates(rateData.karats ?? {})
         setLiveGoldCurrency(rateData.currency ?? 'AED')
         setLiveGoldUnit(rateData.unit ?? 'g')
         setTodayLoanScore(scoreData)
       } catch (error) {
+        console.error("GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-005] live_data_fetch_failed", {
+          operation: 'fetchLiveGoldRate',
+          error_name: error?.name,
+          error_message: error?.message,
+          action: 'If timeout, verify backend latency/availability; otherwise inspect network tab and backend logs using Ref.',
+        })
         setStatusMessage(error.message)
       } finally {
         setIsRateLoading(false)
