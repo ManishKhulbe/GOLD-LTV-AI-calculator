@@ -6,6 +6,7 @@ In production this would query a real database / KYC service.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -14,6 +15,8 @@ from models import (
     LoanStatus, RiskCategory,
 )
 
+logger = logging.getLogger("customer-service")
+
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 # ── Load once at import time ───────────────────────────────────────────────────
@@ -21,11 +24,16 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 def _load_json(name: str) -> dict:
     path = DATA_DIR / name
     if not path.exists():
+        logger.error(f"[tomo-id-016] data_file.missing name={name} path={path}")
         raise RuntimeError(
             f"Data file '{name}' not found. "
             "Please run  python seed_data.py  first."
         )
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.error(f"[tomo-id-017] data_file.load_failed name={name} path={path}", exc_info=exc)
+        raise
 
 
 _customers: dict = {}
