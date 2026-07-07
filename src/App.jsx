@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import GoldLoanWorkspace from './components/GoldLoanWorkspace'
 
 const initialForm = {
@@ -10,14 +10,82 @@ const initialForm = {
   jobProfession: '',
 }
 
-const BACKEND_BASE_URL = 'http://127.0.0.1:8001'
+const BACKEND_BASE_URL =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BACKEND_BASE_URL)
+    ? import.meta.env.VITE_BACKEND_BASE_URL
+    : 'http://127.0.0.1:8001'
 
 const formatAed = (value) =>
   value != null ? `AED ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
 
 const HEADER_TABS = ['Wealth Management', 'Gold Loans', 'Treasury', 'Institutional']
 
+const generateRequestId = () => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch (_e) {
+    // ignore
+  }
+  return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
 function App() {
+  const fetchJsonWithTimeout = async (url, options = {}, { timeoutMs = 8000, requestId } = {}) => {
+    const rid = requestId || generateRequestId()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    const mergedHeaders = {
+      ...(options.headers || {}),
+      'x-request-id': rid,
+    }
+
+    const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-001] outbound_request_start', {
+      request_id: rid,
+      url,
+      method: options.method || 'GET',
+      timeout_ms: timeoutMs,
+    })
+
+    try {
+      const res = await fetch(url, {
+        ...options,
+        headers: mergedHeaders,
+        signal: controller.signal,
+      })
+
+      const endedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+      console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-002] outbound_request_end', {
+        request_id: rid,
+        url,
+        method: options.method || 'GET',
+        ok: res.ok,
+        status: res.status,
+        duration_ms: Math.round(endedAt - startedAt),
+      })
+
+      return { res, requestId: rid }
+    } catch (e) {
+      const endedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+      const isAbort = e && typeof e === 'object' && e.name === 'AbortError'
+      console.error('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-003] outbound_request_error', {
+        request_id: rid,
+        url,
+        method: options.method || 'GET',
+        duration_ms: Math.round(endedAt - startedAt),
+        error_name: e && typeof e === 'object' ? e.name : 'UnknownError',
+        error_message: e instanceof Error ? e.message : String(e),
+        timeout: isAbort,
+        action: isAbort ? 'retry_after_timeout_or_check_backend' : 'check_network_and_backend',
+      })
+      throw e
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
   const [form, setForm] = useState(initialForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
@@ -29,17 +97,37 @@ function App() {
   const [activeScreen, setActiveScreen] = useState('calculator')
   const [valuationResult, setValuationResult] = useState(null)
 
-  const handleChange = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }))
-  }
+  const handleChange = useCallback((field) => {
+    let lastSetAt = 0
+    return (event) => {
+      const now = Date.now()
+      if (now - lastSetAt < 25) return
+      lastSetAt = now
+      setForm((prev) => ({ ...prev, [field]: event.target.value }))
+    }
+  }, [])
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
+    const requestId = generateRequestId()
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-004] form_reset', {
+      request_id: requestId,
+      action: 'reset_form',
+    })
     setForm(initialForm)
-    setStatusMessage('Form has been reset.')
-  }
+    setStatusMessage(`Form has been reset. Ref: ${requestId}`)
+  }, [])
 
   const submitValuation = async (formData) => {
-    const response = await fetch(`${BACKEND_BASE_URL}/loan/calculate`, {
+    const requestId = generateRequestId()
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-005] valuation_submit_start', {
+      request_id: requestId,
+      operation: 'loan.calculate',
+      carat: formData.carat,
+      gold_type: formData.goldType,
+      tenure_months: formData.loanTenure,
+    })
+
+    const { res: response } = await fetchJsonWithTimeout(`${BACKEND_BASE_URL}/loan/calculate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -50,28 +138,62 @@ function App() {
         tenure_months: parseInt(formData.loanTenure, 10),
         job_profession: formData.jobProfession,
       }),
-    })
+    }, { timeoutMs: 10000, requestId })
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}))
-      throw new Error(err.detail || 'Failed to calculate valuation.')
+      console.error('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-006] valuation_submit_failed', {
+        request_id: requestId,
+        operation: 'loan.calculate',
+        status: response.status,
+        error_detail: err && typeof err === 'object' ? err.detail : undefined,
+        action: 'verify_backend_health_and_retry',
+      })
+      throw new Error(
+        (err && typeof err === 'object' && err.detail)
+          ? `Gold loan valuation failed: ${err.detail}. Action: verify inputs and retry. Ref: ${requestId}`
+          : `Gold loan valuation failed: backend returned HTTP ${response.status}. Action: retry or contact support. Ref: ${requestId}`
+      )
     }
 
-    return response.json()
+    const payload = await response.json()
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-007] valuation_submit_success', {
+      request_id: requestId,
+      operation: 'loan.calculate',
+    })
+    return payload
   }
 
   const handleCalculate = async (event) => {
     event.preventDefault()
+    const requestId = generateRequestId()
     setIsSubmitting(true)
-    setStatusMessage('Calculating gold loan value...')
+    setStatusMessage(`Calculating gold loan value... Ref: ${requestId}`)
+
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-008] calculate_clicked', {
+      request_id: requestId,
+      operation: 'ui.calculate',
+    })
 
     try {
       const result = await submitValuation(form)
       setValuationResult(result)
-      setStatusMessage('Valuation calculated successfully.')
+      setStatusMessage(`Valuation calculated successfully. Ref: ${requestId}`)
       setActiveScreen('summary')
+      console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-009] calculate_success', {
+        request_id: requestId,
+        operation: 'ui.calculate',
+      })
     } catch (error) {
-      setStatusMessage(`${error.message}`)
+      console.error('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-010] calculate_failed', {
+        request_id: requestId,
+        operation: 'ui.calculate',
+        error_name: error && typeof error === 'object' ? error.name : 'UnknownError',
+        error_message: error instanceof Error ? error.message : String(error),
+        action: 'retry_or_contact_support_with_ref',
+      })
+      const msg = error instanceof Error ? error.message : 'Gold loan valuation failed. Action: retry. '
+      setStatusMessage(`${msg}${msg.includes('Ref:') ? '' : ` Ref: ${requestId}`}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -79,14 +201,23 @@ function App() {
 
   useEffect(() => {
     const fetchLiveGoldRate = async () => {
+      const requestId = generateRequestId()
       setIsRateLoading(true)
+      console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-011] live_data_fetch_start', {
+        request_id: requestId,
+        operation: 'bootstrap.live_data',
+      })
       try {
-        const [liveRateResponse, scoreResponse] = await Promise.all([
-          fetch(`${BACKEND_BASE_URL}/api/gold-rate/live`),
-          fetch(`${BACKEND_BASE_URL}/api/gold-loan-score/today`),
+        const [{ res: liveRateResponse }, { res: scoreResponse }] = await Promise.all([
+          fetchJsonWithTimeout(`${BACKEND_BASE_URL}/api/gold-rate/live`, {}, { timeoutMs: 8000, requestId }),
+          fetchJsonWithTimeout(`${BACKEND_BASE_URL}/api/gold-loan-score/today`, {}, { timeoutMs: 8000, requestId }),
         ])
-        if (!liveRateResponse.ok) throw new Error('Failed to fetch live gold rate.')
-        if (!scoreResponse.ok) throw new Error('Failed to fetch today loan score.')
+        if (!liveRateResponse.ok) {
+          throw new Error(`Live gold rate fetch failed: HTTP ${liveRateResponse.status}. Action: check backend /api/gold-rate/live. Ref: ${requestId}`)
+        }
+        if (!scoreResponse.ok) {
+          throw new Error(`Today loan score fetch failed: HTTP ${scoreResponse.status}. Action: check backend /api/gold-loan-score/today. Ref: ${requestId}`)
+        }
 
         const [rateData, scoreData] = await Promise.all([
           liveRateResponse.json(),
@@ -96,8 +227,20 @@ function App() {
         setLiveGoldCurrency(rateData.currency ?? 'AED')
         setLiveGoldUnit(rateData.unit ?? 'g')
         setTodayLoanScore(scoreData)
+        console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-012] live_data_fetch_success', {
+          request_id: requestId,
+          operation: 'bootstrap.live_data',
+        })
       } catch (error) {
-        setStatusMessage(error.message)
+        console.error('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-013] live_data_fetch_failed', {
+          request_id: requestId,
+          operation: 'bootstrap.live_data',
+          error_name: error && typeof error === 'object' ? error.name : 'UnknownError',
+          error_message: error instanceof Error ? error.message : String(error),
+          action: 'check_backend_or_retry',
+        })
+        const msg = error instanceof Error ? error.message : `Live data fetch failed. Action: retry. Ref: ${requestId}`
+        setStatusMessage(msg)
       } finally {
         setIsRateLoading(false)
       }
@@ -211,6 +354,15 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
   const gold = r.gold_insights ?? {}
   const risk = r.risk_insights ?? {}
   const loanItems = history.loan_items ?? []
+
+  // Security Supportability: avoid logging raw PII (email/mobile/emirates_id). If logs are added later,
+  // redact first to prevent compliance incidents.
+  const redactPii = (value) => {
+    if (value == null) return value
+    const s = String(value)
+    if (s.length <= 4) return '****'
+    return `${s.slice(0, 2)}****${s.slice(-2)}`
+  }
 
   const [emiMode, setEmiMode] = useState('monthly')
   const [emiBaseMode, setEmiBaseMode] = useState('current')
