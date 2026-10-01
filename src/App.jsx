@@ -8,12 +8,120 @@ const initialForm = {
   jobProfession: '',
 }
 
-const BACKEND_BASE_URL = 'http://127.0.0.1:8001'
+const BACKEND_BASE_URL = import.meta?.env?.VITE_BACKEND_BASE_URL || 'http://127.0.0.1:8001'
 
 const formatSar = (value) =>
   value != null ? `SAR ${Number(value).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
 
 function App() {
+  const fetchJsonWithTimeout = async (url, options = {}, { timeoutMs = 8000, requestId } = {}) => {
+    const rid = requestId || generateRequestId()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    const mergedHeaders = {
+      ...(options.headers || {}),
+      'x-request-id': rid,
+    }
+
+    const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-001] outbound_request_start', {
+      request_id: rid,
+      url,
+      method: options.method || 'GET',
+      timeout_ms: timeoutMs,
+    })
+
+    try {
+      const res = await fetch(url, {
+        ...options,
+        headers: mergedHeaders,
+        signal: controller.signal,
+      })
+
+      const endedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+      console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-002] outbound_request_end', {
+        request_id: rid,
+        url,
+        method: options.method || 'GET',
+        ok: res.ok,
+        status: res.status,
+        duration_ms: Math.round(endedAt - startedAt),
+      })
+
+      return { res, requestId: rid }
+    } catch (e) {
+      const endedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+      const isAbort = e && typeof e === 'object' && e.name === 'AbortError'
+      console.error('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-003] outbound_request_error', {
+        request_id: rid,
+        url,
+        method: options.method || 'GET',
+        duration_ms: Math.round(endedAt - startedAt),
+        error_name: e && typeof e === 'object' ? e.name : 'UnknownError',
+        error_message: e instanceof Error ? e.message : String(e),
+        timeout: isAbort,
+        action: isAbort ? 'retry_after_timeout_or_check_backend' : 'check_network_and_backend',
+      })
+      throw e
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
+  const fetchJsonWithTimeout = async (url, options = {}, { timeoutMs = 8000, requestId } = {}) => {
+    const rid = requestId || generateRequestId()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    const mergedHeaders = {
+      ...(options.headers || {}),
+      'x-request-id': rid,
+    }
+
+    const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-001] outbound_request_start', {
+      request_id: rid,
+      url,
+      method: options.method || 'GET',
+      timeout_ms: timeoutMs,
+    })
+
+    try {
+      const res = await fetch(url, {
+        ...options,
+        headers: mergedHeaders,
+        signal: controller.signal,
+      })
+
+      const endedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+      console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-002] outbound_request_end', {
+        request_id: rid,
+        url,
+        method: options.method || 'GET',
+        ok: res.ok,
+        status: res.status,
+        duration_ms: Math.round(endedAt - startedAt),
+      })
+
+      return { res, requestId: rid }
+    } catch (e) {
+      const endedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+      const isAbort = e && typeof e === 'object' && e.name === 'AbortError'
+      console.error('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-003] outbound_request_error', {
+        request_id: rid,
+        url,
+        method: options.method || 'GET',
+        duration_ms: Math.round(endedAt - startedAt),
+        error_name: e && typeof e === 'object' ? e.name : 'UnknownError',
+        error_message: e instanceof Error ? e.message : String(e),
+        timeout: isAbort,
+        action: isAbort ? 'retry_after_timeout_or_check_backend' : 'check_network_and_backend',
+      })
+      throw e
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
   const [form, setForm] = useState(initialForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
@@ -22,14 +130,25 @@ function App() {
   const [activeScreen, setActiveScreen] = useState('calculator')
   const [valuationResult, setValuationResult] = useState(null)
 
-  const handleChange = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }))
-  }
+  const handleChange = useCallback((field) => {
+    let lastSetAt = 0
+    return (event) => {
+      const now = Date.now()
+      if (now - lastSetAt < 25) return
+      lastSetAt = now
+      setForm((prev) => ({ ...prev, [field]: event.target.value }))
+    }
+  }, [])
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
+    const requestId = generateRequestId()
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-004] form_reset', {
+      request_id: requestId,
+      action: 'reset_form',
+    })
     setForm(initialForm)
-    setStatusMessage('Form has been reset.')
-  }
+    setStatusMessage(`Form has been reset. Ref: ${requestId}`)
+  }, [])
 
   const submitValuation = async (formData) => {
     const response = await fetch(`${BACKEND_BASE_URL}/loan/calculate`, {
@@ -54,16 +173,34 @@ function App() {
 
   const handleCalculate = async (event) => {
     event.preventDefault()
+    const requestId = generateRequestId()
     setIsSubmitting(true)
-    setStatusMessage('Calculating gold loan value...')
+    setStatusMessage(`Calculating gold loan value... Ref: ${requestId}`)
+
+    console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-008] calculate_clicked', {
+      request_id: requestId,
+      operation: 'ui.calculate',
+    })
 
     try {
       const result = await submitValuation(form)
       setValuationResult(result)
-      setStatusMessage('Valuation calculated successfully.')
+      setStatusMessage(`Valuation calculated successfully. Ref: ${requestId}`)
       setActiveScreen('summary')
+      console.info('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-009] calculate_success', {
+        request_id: requestId,
+        operation: 'ui.calculate',
+      })
     } catch (error) {
-      setStatusMessage(`${error.message}`)
+      console.error('GOLD-LTV-AI-calculator/src/App.jsx: [tomo-id-010] calculate_failed', {
+        request_id: requestId,
+        operation: 'ui.calculate',
+        error_name: error && typeof error === 'object' ? error.name : 'UnknownError',
+        error_message: error instanceof Error ? error.message : String(error),
+        action: 'retry_or_contact_support_with_ref',
+      })
+      const msg = error instanceof Error ? error.message : 'Gold loan valuation failed. Action: retry. '
+      setStatusMessage(`${msg}${msg.includes('Ref:') ? '' : ` Ref: ${requestId}`}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -254,6 +391,24 @@ function SummaryScreen({ setActiveScreen, valuationResult }) {
   const gold = r.gold_insights ?? {}
   const risk = r.risk_insights ?? {}
   const loanItems = history.loan_items ?? []
+
+  // Security Supportability: avoid logging raw PII (email/mobile/emirates_id). If logs are added later,
+  // redact first to prevent compliance incidents.
+  const redactPii = (value) => {
+    if (value == null) return value
+    const s = String(value)
+    if (s.length <= 4) return '****'
+    return `${s.slice(0, 2)}****${s.slice(-2)}`
+  }
+
+  // Security Supportability: avoid logging raw PII (email/mobile/emirates_id). If logs are added later,
+  // redact first to prevent compliance incidents.
+  const redactPii = (value) => {
+    if (value == null) return value
+    const s = String(value)
+    if (s.length <= 4) return '****'
+    return `${s.slice(0, 2)}****${s.slice(-2)}`
+  }
 
   const [emiMode, setEmiMode] = useState('monthly')
   const [emiMonths, setEmiMonths] = useState(String(r.suggested_tenure_months ?? 12))
